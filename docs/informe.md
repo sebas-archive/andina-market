@@ -287,7 +287,9 @@ La Tabla 13 indexa cada evidencia con la figura o tabla que la cita.
 | Tablas 11 y 11 | `f4-07-carga-1-replica.txt`, `f4-08-carga-3-replicas.txt` | Prueba de carga con 1 y 3 réplicas |
 | Tabla 12 | `f4-10-escalado-distribucion.txt` | Tres réplicas activas y reparto de solicitudes |
 | Tabla 11 | `f4-09-restauracion.txt` | Restauración con el mismo ID de pedido |
-| Tabla 11 | `f4-11-fallas-y-consumo.txt` | Degradación ante caída de servicios y consumo en reposo |
+| Tablas 11 y 16 | `f4-11-fallas-y-consumo.txt` | Degradación ante caída de servicios y de una réplica; consumo en reposo |
+| §7.2 | `f5-02-cifrado-transito.txt` | TLS 1.3/1.2, redirección, cabeceras y hash de contraseñas |
+| §9 | `f4-12-primera-corrida-carga.txt` | Primera corrida de carga: límite de 512 conexiones del gateway |
 
 La Figura 3 muestra el dashboard de Grafana durante una ráfaga de tráfico real, con los cuatro paneles que exige la Tarea 4.6.
 
@@ -429,3 +431,11 @@ El escenario base cuesta 425,86 USD/mes y un mes de temporada 575,37 USD. En tem
 - Un ciclo de vida en S3 que mueve los respaldos antiguos a Glacier Instant Retrieval.
 
 Con ellas el base queda en 341,48 USD/mes, aún 91,48 USD (37 %) por encima del presupuesto de 250 USD. Las dos partidas que más separan la estimación del presupuesto son los VPC endpoints (73,00 USD) y WAF (34,47 USD). Ambas son decisiones de seguridad que el equipo debe confirmar o recortar. La comparación con el costo actual de los servidores propios no se puede hacer: el caso no declara esa cifra.
+
+## 9. Conclusiones
+
+**Beneficio: la elasticidad por servicio funciona, pero solo donde está la carga.** La separación en servicios independientes permitió escalar pedidos de una a tres réplicas sin reiniciar el gateway. La carga se repartió en 402, 402 y 398 solicitudes por réplica. Los pedidos exitosos subieron de 72,7 % a 88,6 % y la latencia media de creación bajó 39 % (Tabla 12). Al matar una de las tres réplicas con tráfico activo, las 60 solicitudes siguientes respondieron 200 (Tabla 16). Este es el beneficio concreto que ofrece una plataforma de contenedores administrados frente a los servidores propios de AndinaMarket: cada dominio crece por separado y la falla de una instancia no interrumpe el servicio. El mismo experimento mostró el límite del beneficio: el rendimiento global no pasó de 63 req/s porque se escaló un servicio que no estaba saturado. La elasticidad solo mejora el sistema cuando se aplica, guiada por métricas, al componente que limita.
+
+**Limitación: la demo local y la estimación de costos dependen de supuestos que la nube real puede invalidar.** La demo corrió en un solo equipo de 20 CPU, sin latencia de red hacia Colombia, sin Multi-AZ y con el generador de carga compitiendo por los mismos núcleos (§6.5). Por eso, la capacidad medida (unas 30 consultas de catálogo por segundo por réplica) no se puede trasladar directamente a una tarea de Fargate y debe recalibrarse. Lo mismo ocurre con el costo: 425,86 USD/mes en el escenario base, 341,48 USD con optimizaciones, frente a un presupuesto de 250 USD. El 79 % del incremento en temporada depende de cuántas solicitudes llegan a CloudFront, WAF y los logs, cifras que en este trabajo son supuestos y no mediciones. Migrar a la nube no garantiza ahorro: el costo final depende de decisiones de seguridad (VPC endpoints, WAF) que el equipo debe validar con tráfico real.
+
+**Desafío: en un sistema distribuido, la falla aparece en la interacción entre componentes y no en cada uno por separado.** Las 30 pruebas automatizadas pasaron, pero en la primera prueba de carga falló el 30,34 % de las solicitudes (`f4-12-primera-corrida-carga.txt`) por un límite del gateway que ninguna prueba aislada revelaba: 512 conexiones por defecto en Nginx. Corregido ese límite, apareció el siguiente cuello de botella. Cada listado de productos hace cinco consultas a inventario, lo que saturó ese servicio al 85–89 % de un núcleo y produjo 4.939 respuestas 504 en la medición B. Diagnosticarlo exigió cruzar logs de Nginx y de cada servicio por marca de tiempo, porque los servicios no comparten un identificador de correlación. La consistencia entre reserva de stock y pedido también exigió diseño explícito: compensación ante fallos y un orden de escritura correcto para la idempotencia. El desafío es diseñar desde el inicio la observabilidad y los contratos entre servicios.

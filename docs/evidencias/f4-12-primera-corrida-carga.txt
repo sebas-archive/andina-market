@@ -1,0 +1,31 @@
+# Primera corrida de la prueba de carga (pedidos=1) — 2026-10-31T15:31:50-05:00
+# Nginx con worker_connections por defecto (512). El archivo completo de esta corrida fue sobrescrito
+# por la segunda ejecución de scripts/escalar.sh; se conserva aquí el resumen tal como lo imprimieron k6,
+# Nginx y docker stats en esa corrida.
+
+$ docker compose --profile carga run --rm k6 run /pruebas/pedidos.js
+     ✗ detalle 200
+      ↳  74% — ✓ 1965 / ✗ 658
+     ✗ listar 200
+      ↳  72% — ✓ 7024 / ✗ 2616
+     ✗ pedido 201
+      ↳  37% — ✓ 515 / ✗ 867
+     checks.........................: 69.65% 9505 out of 13646
+     dropped_iterations.............: 155    0.8408/s
+   ✗ http_req_duration..............: avg=1.08s    p(50)=26.05ms p(95)=3.93s    p(99)=4.21s    max=5s
+     ✗ { name:crear_pedido }........: avg=737.18ms p(50)=28.5ms  p(95)=2s       p(99)=2s       max=2.06s
+     ✗ { name:detalle_producto }....: avg=1.09s    p(50)=11.99ms p(95)=3.95s    p(99)=4.2s     max=4.47s
+     ✗ { name:listar_productos }....: avg=1.13s    p(50)=27.43ms p(95)=4.05s    p(99)=4.23s    max=5s
+   ✗ http_req_failed................: 30.34% 4141 out of 13647
+     http_reqs......................: 13647  74.028356/s
+# advertencias "Request Failed" de k6 (error EOF): 3618
+# código de salida de k6: 99
+
+# CPU media por contenedor durante la prueba (docker stats, 100 % = 1 núcleo)
+andina-market-inventario-1         72.0 % (92 muestras)
+andina-market-pedidos-1             5.4 % (92 muestras)
+andina-market-productos-1          64.1 % (92 muestras)
+
+$ docker compose logs nginx | grep -E '\[(alert|error)\]' | sort | uniq -c
+   3653 [alert] 33#33: 512 worker_connections are not enough
+      7+ [error] upstream timed out (110: Operation timed out) while reading response header from upstream
