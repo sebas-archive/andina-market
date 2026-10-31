@@ -21,4 +21,4 @@ Formato: propuesta · justificación (una línea). El equipo decide.
 17. **NAT Gateway sin precio verificable.** La tarifa de NAT Gateway no apareció en el archivo de EC2 de la Price List API; por eso la red privada se costeó con VPC endpoints (precio verificado). Si el equipo prefiere NAT, hay que consultar la página de precios de Amazon VPC.
 18. **Correlation-id (§7.5).** La demo no propaga `X-Correlation-ID`; implementarlo en el gateway y los 4 servicios facilitaría el diagnóstico que hoy se hace cruzando logs por marca de tiempo.
 19. **Exportación sin pandoc/LaTeX locales (Tarea 7.3).** El equipo no tiene `pandoc` ni `xelatex`; `scripts/exportar.sh` usa la imagen `pandoc/core:3.5` y Chrome para imprimir a PDF, con estilos en `docs/informe.css`. Son dos archivos fuera de la estructura de la sección 2, necesarios para reproducir el PDF.
-20. **Anexo C pendiente de la Fase 8.** La estructura del informe incluye el Anexo C (rúbrica autoevaluada), que se completa en la Tarea 8.2.
+20. **Anexo C (resuelto en la Tarea 8.2).** La autoevaluación preliminar da 4,6/5,0; el equipo debe revisarla antes de entregar.

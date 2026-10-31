@@ -243,7 +243,7 @@ La Figura 2 muestra los contenedores de la demo. Nginx cumple el papel del ALB, 
 **Figura 2.** Arquitectura de la demostración local. Fuente: `docs/diagrama-demo.mmd`.
 
 - **Versiones:** Python 3.12.8, FastAPI 0.115.6, SQLAlchemy 2.0.36, PostgreSQL 16.6, Nginx 1.27.3, Prometheus 2.55.1, Grafana 11.4.0 y k6 0.55.0.
-- **Arranque:** `cp .env.example .env` y `docker compose up -d --wait`. El arranque desde volúmenes vacíos más la prueba de humo tomó 21 s (`f4-06-humo.txt`).
+- **Arranque:** `cp .env.example .env` y `docker compose up -d --wait`. Desde una copia limpia del repositorio, los 8 contenedores quedan healthy en 18,6 s con las imágenes en caché y ocupan unos 389 MiB de RAM en reposo (`f8-01-reproducibilidad.txt`).
 - **Equipo de prueba:** 20 CPU lógicas y 23 GB de RAM. En reposo, los ocho contenedores ocupan entre 4,5 y 77 MiB cada uno (`f4-11-fallas-y-consumo.txt`).
 - **Recorte:** la imagen de MinIO no estaba disponible en los registros públicos, así que el almacenamiento de objetos es un volumen local con URL firmadas por HMAC de 15 min, equivalentes a las URL prefirmadas de S3.
 
@@ -506,12 +506,13 @@ OWASP Foundation. (2021). *OWASP Top 10:2021*. Recuperado el 31 de octubre de 20
 | Figura 2 | `f4-01-demo.png` | Contenedores de la demo |
 | Figura 3 | `f4-05-grafana.png` | Dashboard con RPS, p95, 5xx y CPU/memoria bajo tráfico real |
 | Tabla 11 | `f4-06-humo.txt` | Flujo completo y descuento exacto de stock |
-| Tablas 11 y 11 | `f4-07-carga-1-replica.txt`, `f4-08-carga-3-replicas.txt` | Prueba de carga con 1 y 3 réplicas |
+| Tablas 11 y 12 | `f4-07-carga-1-replica.txt`, `f4-08-carga-3-replicas.txt` | Prueba de carga con 1 y 3 réplicas |
 | Tabla 12 | `f4-10-escalado-distribucion.txt` | Tres réplicas activas y reparto de solicitudes |
 | Tabla 11 | `f4-09-restauracion.txt` | Restauración con el mismo ID de pedido |
 | Tablas 11 y 15 | `f4-11-fallas-y-consumo.txt` | Degradación ante caída de servicios y de una réplica; consumo en reposo |
 | §7.2 | `f5-02-cifrado-transito.txt` | TLS 1.3/1.2, redirección, cabeceras y hash de contraseñas |
 | §9 | `f4-12-primera-corrida-carga.txt` | Primera corrida de carga: límite de 512 conexiones del gateway |
+| §6.2 | `f8-01-reproducibilidad.txt` | Arranque desde una copia limpia, humo, 30 pruebas y limpieza con `down -v` |
 | Tabla 11 | `f4-13-pytest.txt` | 30 pruebas automatizadas de los 4 servicios en verde |
 
 ### Anexo B. Reproducción de la demostración
@@ -529,3 +530,17 @@ docker compose down -v                                 # deja el sistema limpio
 ```
 
 Servicios disponibles: gateway en `https://localhost:8443` (certificado autofirmado), Grafana en `http://localhost:3000` y Prometheus en `http://localhost:9090` (el puerto se cambia con `PROMETHEUS_PORT`).
+
+### Anexo C. Autoevaluación contra la rúbrica
+
+La rúbrica de la guía describe cinco niveles por criterio, pero no asigna puntaje a cada uno. Para esta autoevaluación se asigna el puntaje completo al nivel Excelente y entre el 80 % y el 90 % al nivel Bueno, según cuánto falte. La Tabla A2 resume el resultado. El equipo debe revisar y ajustar las notas antes de entregar.
+
+**Tabla A2.** Autoevaluación por criterio.
+
+| Criterio | Puntos | Autoevaluación | Evidencia (sección/figura/archivo) | Qué falta para el nivel superior |
+|---|---|---|---|---|
+| 1. Análisis conceptual y selección tecnológica | 1,0 | Excelente: 1,0 | §3 (Tablas 1–3: 8 requerimientos medibles y trazabilidad); §4 (Tablas 4–6: comparación con los 5 criterios, matriz ponderada con aritmética verificada, responsabilidad compartida) | Ya está en el nivel máximo. Para sostenerlo, el equipo debe poder justificar los puntajes 1–5 de la matriz, que son juicio propio. |
+| 2. Diseño de la arquitectura distribuida | 1,5 | Excelente: 1,5 | Figura 1 con los 7 elementos numerados; Tabla 7 (13 componentes con alternativa descartada); §5.2 (compra en 12 pasos, Tabla 8 de fallas, flujo de respaldo con RPO/RTO) | Ya está en el nivel máximo. El diagrama de despliegue opcional de §6.3 se omitió porque no aportaba a la rúbrica. |
+| 3. Implementación o demostración técnica | 1,5 | Bueno: 1,3 | `f8-01` (arranque reproducible y `down -v` limpio); `f4-13` (30 pruebas); `f4-06` (humo); Tablas 11–12 (resultados y carga con 1 y 3 réplicas); `f4-09` (restauración); Tabla 15 (fallas) | La demo no cumple RNF-03/04 bajo carga: 63 req/s procesadas y 42,6 % de errores, con productos e inventario como cuello de botella. Para Excelente: medir escalando el servicio que satura (propuesta 15) y recuperar MinIO. |
+| 4. Seguridad, costos, documentación y conclusiones | 1,0 | Bueno: 0,8 | §7 (Tablas 13–16: control de acceso, amenazas con OWASP, fallas, alarmas); §8 y `costos.md` (precios oficiales con fuente y fecha); §9 (3 conclusiones con datos propios); §10 (15 referencias) | Faltan la comparación con el costo actual (dato no disponible en el caso), la captura de la calculadora de AWS y los datos de portada. Además, el equipo debe decidir cómo cerrar la brecha con el presupuesto de 250 USD (propuesta 16). |
+| **Total** | **5,0** | **4,6** | | |

@@ -1,0 +1,46 @@
+# Reproducibilidad desde el commit b1fecba exportado con 'git archive HEAD' — 2026-10-31T16:05:56-05:00
+# Host: 20 CPU, 23 GB RAM; imágenes base y capas de build ya en caché local
+# Primer intento con .env.example sin cambios: falló al publicar 0.0.0.0:9090 (puerto ocupado por otro proceso del host).
+
+$ cp .env.example .env && export PROMETHEUS_PORT=9091
+$ time docker compose up -d --wait
+código: 0 | arranque hasta healthy: 18619 ms
+db: Up 17 seconds (healthy)
+grafana: Up 17 seconds
+inventario: Up 12 seconds (healthy)
+nginx: Up 10 seconds (healthy)
+pedidos: Up 10 seconds (healthy)
+productos: Up 11 seconds (healthy)
+prometheus: Up 17 seconds
+usuarios: Up 12 seconds (healthy)
+
+$ bash scripts/humo.sh
+  disponible antes=100 después=98 diferencia=2 esperado=2
+
+OK: prueba de humo superada en 1 s
+
+$ docker compose run --rm usuarios   pytest -q  -> 8 passed in 4.24s
+$ docker compose run --rm productos  pytest -q  -> 8 passed in 0.73s
+$ docker compose run --rm inventario pytest -q  -> 6 passed in 0.56s
+$ docker compose run --rm pedidos    pytest -q  -> 8 passed in 1.08s
+
+$ docker stats --no-stream (en reposo, tras las pruebas)
+andina-market-db-1 2.88% 38.73MiB / 23.25GiB
+andina-market-grafana-1 0.04% 63.56MiB / 23.25GiB
+andina-market-inventario-1 21.53% 61.16MiB / 23.25GiB
+andina-market-nginx-1 0.00% 4.215MiB / 23.25GiB
+andina-market-pedidos-1 0.12% 64.41MiB / 23.25GiB
+andina-market-productos-1 0.14% 64.37MiB / 23.25GiB
+andina-market-prometheus-1 0.16% 24.4MiB / 23.25GiB
+andina-market-usuarios-1 22.50% 68.53MiB / 23.25GiB
+RAM total de los contenedores: 388 MiB
+
+$ docker compose down -v
+recursos eliminados: 12
+contenedores restantes del proyecto: 0
+volúmenes restantes del proyecto: 0
+
+# Repetición: segundo ciclo up + humo + down -v
+arranque: 18493 ms
+OK: prueba de humo superada en 1 s
+volúmenes restantes: 0
