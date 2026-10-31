@@ -1,0 +1,90 @@
+name: andina-market
+
+services:
+  db:
+    image: postgres:16.6-alpine
+    env_file: .env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  usuarios:
+    build: ./services/usuarios
+    environment:
+      DATABASE_URL: postgresql+psycopg://svc_usuarios:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRA_MIN: ${JWT_EXPIRA_MIN}
+    ports:
+      - "8001:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  inventario:
+    build: ./services/inventario
+    environment:
+      DATABASE_URL: postgresql+psycopg://svc_inventario:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      SERVICE_TOKEN: ${SERVICE_TOKEN}
+    ports:
+      - "8004:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  productos:
+    build: ./services/productos
+    environment:
+      DATABASE_URL: postgresql+psycopg://svc_catalogo:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - objetos:/data/objetos
+    ports:
+      - "8002:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      inventario:
+        condition: service_started
+    restart: unless-stopped
+
+  pedidos:
+    build: ./services/pedidos
+    environment:
+      DATABASE_URL: postgresql+psycopg://svc_pedidos:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET}
+      SERVICE_TOKEN: ${SERVICE_TOKEN}
+      PAGO_FALLA_PCT: "10"
+    depends_on:
+      db:
+        condition: service_healthy
+      productos:
+        condition: service_started
+      inventario:
+        condition: service_started
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27.3-alpine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      - usuarios
+      - productos
+      - inventario
+      - pedidos
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  objetos:

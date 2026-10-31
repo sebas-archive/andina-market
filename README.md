@@ -32,7 +32,23 @@ docker compose up -d --wait
 | Gateway Nginx (HTTPS) | 8443 |
 | Servicio usuarios | 8001 |
 | Servicio productos | 8002 |
-| Servicio pedidos | 8003 |
+| Servicio pedidos | sin puerto publicado (se escala con `--scale`; acceso por el gateway) |
 | Servicio inventario | 8004 |
 | Prometheus | 9090 |
-| PostgreSQL, MinIO, Grafana | pendiente (Fase 4) |
+| PostgreSQL | sin puerto publicado |
+| Grafana | pendiente (Tarea 4.6) |
+
+## Guion de demo
+
+Flujo completo a través del gateway (`localhost:8080`): registro → login → catálogo → pedido → pago → consulta. Requiere `python3` para leer el JSON.
+
+```bash
+curl -s -X POST localhost:8080/api/usuarios/registro -H 'Content-Type: application/json' -d '{"email":"demo@example.com","password":"ClaveDemo123","nombre":"Demo"}'
+TOKEN=$(curl -s -X POST localhost:8080/api/usuarios/login -H 'Content-Type: application/json' -d '{"email":"demo@example.com","password":"ClaveDemo123"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
+PRODUCTO=$(curl -s 'localhost:8080/api/productos?pagina=1&tamano=5' | python3 -c 'import sys,json;print(json.load(sys.stdin)["items"][0]["id"])')
+PEDIDO=$(curl -s -X POST localhost:8080/api/pedidos -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "{\"items\":[{\"producto_id\":\"$PRODUCTO\",\"cantidad\":2}]}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+curl -s -X POST localhost:8080/api/pedidos/$PEDIDO/pago -H "Authorization: Bearer $TOKEN"
+curl -s localhost:8080/api/pedidos/$PEDIDO -H "Authorization: Bearer $TOKEN"
+```
+
+El pago es simulado y falla en el 10 % de los intentos (`PAGO_FALLA_PCT`); si devuelve 402, el stock reservado se libera. Usuarios de prueba creados por `db/seed.sql`: `admin@example.com` (admin), `cliente1@example.com` y `cliente2@example.com`, con la contraseña de `SEED_USUARIOS_PASSWORD`.
