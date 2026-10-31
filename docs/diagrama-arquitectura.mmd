@@ -1,0 +1,50 @@
+%% Arquitectura AndinaMarket (Guía 7).
+%% Render: npx -y @mermaid-js/mermaid-cli@11.4.2 -i docs/diagrama-arquitectura.mmd -o docs/evidencias/f3-01-arquitectura.png -w 2000 -b white
+flowchart TB
+  U["1 · Usuarios: web y móvil"] -->|HTTPS/TLS 443| CF["6 · CDN + WAF (CloudFront)"]
+  CF -->|HTTPS| WEB["2 · Interfaz web y app (SPA en S3)"]
+  WEB -->|API REST HTTPS 443| ALB
+
+  subgraph VPC["VPC us-east-1 · 2 zonas de disponibilidad"]
+    subgraph PUB["Subred pública"]
+      ALB["3 · API Gateway / Balanceador (ALB)"]
+    end
+    subgraph APP["Subred privada de aplicación · ECS Fargate"]
+      US["4 · Servicio Usuarios"]
+      PR["4 · Servicio Productos"]
+      PE["4 · Servicio Pedidos"]
+      IN["4 · Servicio Inventario"]
+    end
+    subgraph DATA["Subred privada de datos"]
+      DB[("5 · RDS PostgreSQL Multi-AZ")]
+    end
+  end
+
+  subgraph REG["Servicios regionales administrados (acceso por VPC endpoints)"]
+    S3[("5 · S3: imágenes, respaldos")]
+    SQS["Cola SQS: pagos"]
+    IAM["6 · IAM + Secrets Manager + JWT"]
+    CW["7 · CloudWatch: métricas, logs, alarmas"]
+  end
+
+  PAS["Pasarela de pago externa"]
+  OPS["7 · Alertas al equipo"]
+
+  ALB -->|HTTP 8000| US
+  ALB -->|HTTP 8000| PR
+  ALB -->|HTTP 8000| PE
+  ALB -->|HTTP 8000| IN
+  PR -->|HTTP interno: stock| IN
+  PE -->|HTTP interno: reserva, X-Service-Token| IN
+  US -->|TCP 5432 TLS| DB
+  PR -->|TCP 5432 TLS| DB
+  PE -->|TCP 5432 TLS| DB
+  IN -->|TCP 5432 TLS| DB
+  PR -->|HTTPS| S3
+  DB -.->|snapshots y PITR| S3
+  PE -->|HTTPS| SQS
+  SQS -->|HTTPS| PE
+  PE -->|HTTPS| PAS
+  ALB -.->|validación de token y secretos| IAM
+  US & PR & PE & IN -.->|logs y métricas| CW
+  CW -->|alarma| OPS

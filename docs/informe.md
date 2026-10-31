@@ -107,3 +107,74 @@ La Tabla 6 resume los servicios seleccionados y su rol en la solución.
 | AWS Secrets Manager | Custodia de credenciales de base de datos y del secreto JWT. |
 | AWS IAM | Permisos mínimos para tareas, operadores y servicios. |
 | Amazon CloudWatch | Métricas, registros y alarmas de los servicios. |
+
+## 5. Arquitectura
+
+La Figura 1 presenta la arquitectura propuesta. Los números de los nodos corresponden a los siete elementos mínimos de la guía: (1) usuarios, (2) interfaz web, (3) punto de entrada, (4) servicios de dominio, (5) base de datos y almacenamiento, (6) seguridad y control de acceso, y (7) monitoreo, registros y copias de seguridad. Las flechas indican protocolo y sentido; las líneas discontinuas son flujos de control, registro o respaldo.
+
+![Figura 1. Arquitectura de AndinaMarket en AWS.](evidencias/f3-01-arquitectura.png)
+
+**Figura 1.** Arquitectura de AndinaMarket en AWS. Fuente editable: `docs/diagrama-arquitectura.mmd` y `docs/diagrama-arquitectura.drawio`.
+
+Solo el ALB está en subred pública. Los cuatro servicios y la base de datos están en subredes privadas, sin dirección IP pública, y alcanzan S3, SQS, Secrets Manager y CloudWatch mediante VPC endpoints.
+
+### 5.1 Justificación por componente
+
+La Tabla 7 justifica cada componente de la Figura 1 y registra la alternativa descartada.
+
+**Tabla 7.** Justificación de componentes.
+
+| Componente | Servicio concreto | Función en el sistema | Por qué | Alternativa descartada y motivo |
+|---|---|---|---|---|
+| CDN + WAF | Amazon CloudFront + AWS WAF | Entrega la interfaz y filtra tráfico malicioso antes de la VPC. | Descarga del ALB el contenido estático y bloquea ataques en el borde (RNF-02). | Servir la interfaz desde el ALB: consume capacidad de los servicios en temporada. |
+| Interfaz web y app | SPA en S3 | Interfaz para navegadores y móviles; mantiene el carrito en el cliente. | Archivos estáticos sin servidores que operar. | Renderizado en servidor: añade un quinto servicio que escalar. |
+| API Gateway / Balanceador | Application Load Balancer | Termina TLS, enruta por ruta (`/api/pedidos`…) y reparte entre réplicas. | Se integra con los servicios de ECS en Fargate (AWS, s.f.-b). | Amazon API Gateway: duplica el enrutamiento que ya hace el ALB. |
+| Servicio Usuarios | ECS Fargate | Registro, login, emisión de JWT y roles (RF-01). | Escala aparte del catálogo; el login no depende de pedidos. | Autenticación dentro de cada servicio: duplica la lógica de credenciales. |
+| Servicio Productos | ECS Fargate | Catálogo, búsqueda e imágenes (RF-02). | Recibe la mayor parte del tráfico de lectura y debe seguir activo si falla pedidos (RNF-01). | Unir catálogo y pedidos: una falla de pedidos tumbaría el catálogo. |
+| Servicio Pedidos | ECS Fargate | Crea pedidos, calcula totales y orquesta la reserva y el pago (RF-03). | Concentra la carga de escritura del pico; escala de forma independiente (RNF-04). | Orquestación en la interfaz: el total quedaría en manos del cliente. |
+| Servicio Inventario | ECS Fargate | Existencias, reserva y liberación por SKU (RF-04). | Una sola fuente de verdad del stock evita sobreventa con reserva transaccional. | Descontar stock desde pedidos: rompería el aislamiento por dominio. |
+| Base de datos | RDS PostgreSQL Multi-AZ | Persistencia con un esquema por dominio (`usuarios`, `catalogo`, `pedidos`, `inventario`). | Réplica síncrona en otra zona con conmutación automática (AWS, s.f.-e); transacciones para la reserva. | DynamoDB: la reserva con `SELECT ... FOR UPDATE` y `CHECK` exige un modelo relacional. |
+| Almacenamiento de archivos | Amazon S3 | Imágenes de producto, interfaz web y respaldos. | Servicio administrado; el cliente decide cifrado y permisos (AWS, s.f.-a). | Volumen de disco en los contenedores: se pierde al reemplazar una tarea. |
+| Cola de pagos | Amazon SQS | Desacopla el pedido de la respuesta de la pasarela externa. | Si la pasarela tarda o falla, el pedido no se pierde y se reintenta. | Llamada síncrona: un pago lento bloquea la creación de pedidos en el pico. |
+| Seguridad y control de acceso | AWS IAM + Secrets Manager + JWT | Permisos mínimos por tarea, custodia de secretos y autorización por rol. | El secreto JWT y las credenciales de RDS no viven en el código ni en la imagen. | Variables de entorno en la definición de tarea: el secreto queda visible en la configuración. |
+| Monitoreo y registros | Amazon CloudWatch | Métricas, logs y alarmas de los cuatro servicios y de RDS. | Integrado con ECS y RDS, sin servidores de monitoreo propios. | Prometheus y Grafana autogestionados: se usan en la demo, pero en producción exigen operarlos. |
+| Pasarela de pago externa | Proveedor de pagos (simulado en la demo) | Procesa el cobro; la plataforma no almacena datos de tarjeta. | Saca los datos de tarjeta del alcance de la plataforma (RNF-02). | Procesar tarjetas en un servicio propio: amplía la superficie de riesgo del caso. |
+
+**Aislamiento de datos.** Cada servicio se conecta a RDS con un usuario propio que solo tiene permisos sobre su esquema. Ningún servicio lee tablas de otro dominio: Productos obtiene el stock de Inventario por HTTP, y Pedidos reserva unidades mediante el endpoint interno de Inventario protegido con `X-Service-Token`.
+
+### 5.2 Flujos de comunicación
+
+**Compra completa.** Los pasos usan los nombres de los componentes de la Figura 1.
+
+1. Los Usuarios: web y móvil abren la Interfaz web y app (SPA en S3) a través de CDN + WAF (CloudFront) por HTTPS.
+2. La interfaz envía `POST /api/usuarios/login` al API Gateway / Balanceador (ALB), que lo enruta al Servicio Usuarios; este verifica el hash en RDS y emite un JWT de 15 min firmado con el secreto de Secrets Manager.
+3. La interfaz consulta `GET /api/productos`; el Servicio Productos lee el esquema `catalogo` en RDS, pide el stock al Servicio Inventario con un tiempo límite de 500 ms y devuelve URL firmadas de las imágenes guardadas en el nodo «S3: imágenes, respaldos».
+4. El usuario arma el carrito en la interfaz, sin llamadas al servidor.
+5. La interfaz envía `POST /api/pedidos` con el token Bearer y una cabecera `Idempotency-Key`; el Servicio Pedidos valida el token y calcula el total con los precios del catálogo.
+6. El Servicio Pedidos llama a `POST /api/inventario/{id}/reservar` del Servicio Inventario, que bloquea la fila con `SELECT ... FOR UPDATE` y descuenta las unidades, o responde 409 `stock_insuficiente`.
+7. El Servicio Pedidos guarda el pedido en estado `creado` en RDS; si la escritura falla, solicita a Inventario liberar la reserva (compensación).
+8. La interfaz envía `POST /api/pedidos/{id}/pago`; el Servicio Pedidos publica la solicitud en la Cola SQS: pagos.
+9. El consumidor de la cola, dentro del Servicio Pedidos, invoca la Pasarela de pago externa por HTTPS.
+10. Si el pago se aprueba, el pedido pasa a `pagado`; si se rechaza, Pedidos solicita a Inventario liberar la reserva.
+11. El Servicio Inventario registra el movimiento en `inventario.movimiento` y, si el disponible baja de 10 unidades, emite la alerta a CloudWatch: métricas, logs, alarmas, que la reenvía como Alertas al equipo.
+12. La interfaz consulta `GET /api/pedidos/{id}` y muestra la confirmación; los cuatro servicios envían sus registros a CloudWatch.
+
+**Flujo degradado.** La Tabla 8 describe el efecto de cada falla sobre el flujo anterior.
+
+**Tabla 8.** Comportamiento ante fallas.
+
+| Falla | Efecto visible | Mecanismo | Tiempo de recuperación |
+|---|---|---|---|
+| Cae una tarea del Servicio Pedidos | Ninguno si quedan otras réplicas; algunas solicitudes en curso pueden fallar. | El ALB deja de enviar tráfico a la tarea que no responde y ECS la reemplaza. | Se mide en la demo (§7.4). |
+| Caen todas las tareas del Servicio Pedidos | No se pueden crear ni pagar pedidos; el catálogo y el login siguen disponibles. | Servicios independientes detrás del ALB (degradación controlada, RNF-01). | Hasta que ECS levanta nuevas tareas; se mide en la demo (§7.4). |
+| Falla el Servicio Inventario | El catálogo responde con `stock: null`; no se pueden crear pedidos. | Tiempo límite de 500 ms en Productos y respuesta de respaldo. | Igual que la recuperación de una tarea de ECS. |
+| La Cola SQS: pagos no está disponible | Los pedidos quedan en estado `creado` sin procesar el pago. | El pedido y la reserva ya están persistidos; la solicitud de pago se reintenta. | Depende de AWS; no lo controla AndinaMarket. |
+| RDS pierde la zona primaria | Errores de conexión durante la conmutación; luego el servicio se reanuda. | Conmutación automática a la réplica en espera; los servicios deben reconectarse (AWS, s.f.-f). | Típicamente 60–120 s (AWS, s.f.-f). |
+
+**Flujo de respaldo.** RDS sube los registros de transacciones a S3 cada cinco minutos y permite restaurar a cualquier instante dentro del periodo de retención (AWS, s.f.-g), lo que cumple el RPO de 15 min de RNF-01. Se respaldan:
+
+- La base de datos completa, con respaldos automáticos diarios y registros de transacciones; retención de 30 días.
+- Una copia lógica diaria (`pg_dump`) en el bucket S3 de respaldos, independiente del mecanismo de RDS.
+- Las imágenes de producto en S3, con versionado de objetos.
+
+La restauración crea una instancia nueva a partir del instante elegido, sin modificar la original (AWS, s.f.-g). Después se actualiza el endpoint de conexión en Secrets Manager y se reinician las tareas de ECS. Cada mes se ensaya la restauración midiendo su duración frente al RTO de 4 h; en la demo se ensaya con `scripts/respaldo.sh` (§7.3).
