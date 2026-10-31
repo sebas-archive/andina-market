@@ -18,11 +18,17 @@ docker compose up -d --wait
 
 | Entregable | Ubicación | Estado |
 |---|---|---|
-| Documento técnico | `docs/informe.md` → `entrega/Informe_Guia7_AndinaMarket.pdf` | pendiente |
-| Diagrama de arquitectura | `docs/diagrama-arquitectura.mmd`, `docs/diagrama-arquitectura.drawio` | pendiente |
-| Evidencias de implementación | `docs/evidencias/` → `entrega/Evidencias_Guia7.zip` | pendiente |
-| Análisis de costos | `docs/costos.md` | pendiente |
-| Referencias bibliográficas (APA 7) | `docs/referencias.md` | pendiente |
+| Documento técnico | [`docs/informe.md`](docs/informe.md) → `entrega/Informe_Guia7_AndinaMarket.pdf` (se genera con `scripts/exportar.sh`) | Completo; faltan los datos de portada marcados `[verificar]` |
+| Diagrama de arquitectura | [`docs/diagrama-arquitectura.mmd`](docs/diagrama-arquitectura.mmd), [`.drawio`](docs/diagrama-arquitectura.drawio), PNG en [`docs/evidencias/f3-01-arquitectura.png`](docs/evidencias/f3-01-arquitectura.png) | Completo |
+| Evidencias de implementación | [`docs/evidencias/`](docs/evidencias/) → [`entrega/Evidencias_Guia7.zip`](entrega/Evidencias_Guia7.zip) (índice: Anexo A del informe) | Completo; falta `f5-01-calculadora.png` (ver `docs/BLOQUEOS.md`) |
+| Análisis de costos | [`docs/costos.md`](docs/costos.md) e informe §8 | Completo; falta el costo actual del caso (`[verificar]`) |
+| Referencias bibliográficas (APA 7) | [`docs/referencias.md`](docs/referencias.md) e informe §10 | Completo (15 fuentes) |
+
+Exportar el informe a PDF (requiere Docker y Chrome o Chromium):
+
+```bash
+CHROME=/ruta/a/chrome bash scripts/exportar.sh
+```
 
 ## Puertos
 

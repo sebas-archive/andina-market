@@ -1,0 +1,43 @@
+# Pruebas automatizadas de los 4 servicios contra PostgreSQL de Docker — 2026-10-31T16:03:26-05:00
+
+$ docker compose run --rm usuarios pytest -v
+tests/test_usuarios.py::test_registro_devuelve_201 PASSED
+tests/test_usuarios.py::test_registro_email_duplicado_devuelve_409 PASSED
+tests/test_usuarios.py::test_registro_invalido_devuelve_422 PASSED
+tests/test_usuarios.py::test_login_devuelve_token PASSED
+tests/test_usuarios.py::test_login_invalido_devuelve_401 PASSED
+tests/test_usuarios.py::test_bloqueo_tras_5_intentos_devuelve_423 PASSED
+tests/test_usuarios.py::test_me_con_token_devuelve_200 PASSED
+tests/test_usuarios.py::test_me_sin_token_devuelve_401 PASSED
+============================== 8 passed in 4.20s ===============================
+
+$ docker compose run --rm productos pytest -v
+tests/test_productos.py::test_paginacion_correcta PASSED
+tests/test_productos.py::test_busqueda_por_nombre PASSED
+tests/test_productos.py::test_listado_incluye_stock_e_imagen PASSED
+tests/test_productos.py::test_producto_inexistente_devuelve_404 PASSED
+tests/test_productos.py::test_crear_sin_token_devuelve_401 PASSED
+tests/test_productos.py::test_crear_con_rol_cliente_devuelve_403 PASSED
+tests/test_productos.py::test_crear_con_admin_e_imagen_devuelve_201 PASSED
+tests/test_productos.py::test_url_firmada_sirve_la_imagen_y_rechaza_firma_alterada PASSED
+============================== 8 passed in 0.75s ===============================
+
+$ docker compose run --rm inventario pytest -v
+tests/test_inventario.py::test_consulta_devuelve_existencias PASSED
+tests/test_inventario.py::test_consulta_producto_inexistente_devuelve_404 PASSED
+tests/test_inventario.py::test_reserva_descuenta PASSED
+tests/test_inventario.py::test_reserva_sin_stock_devuelve_409 PASSED
+tests/test_inventario.py::test_reserva_sin_token_devuelve_401 PASSED
+tests/test_inventario.py::test_liberacion_repone PASSED
+============================== 6 passed in 0.59s ===============================
+
+$ docker compose run --rm pedidos pytest -v
+tests/test_pedidos.py::test_crear_pedido_devuelve_201 PASSED
+tests/test_pedidos.py::test_sin_token_devuelve_401 PASSED
+tests/test_pedidos.py::test_sin_stock_devuelve_409_y_compensa_la_reserva PASSED
+tests/test_pedidos.py::test_total_correcto_con_dos_items PASSED
+tests/test_pedidos.py::test_reintento_con_misma_idempotency_key_devuelve_el_mismo_pedido PASSED
+tests/test_pedidos.py::test_pago_exitoso_y_consulta PASSED
+tests/test_pedidos.py::test_pago_rechazado_devuelve_402_y_libera_stock PASSED
+tests/test_pedidos.py::test_pedido_de_otro_usuario_devuelve_404 PASSED
+============================== 8 passed in 1.10s ===============================

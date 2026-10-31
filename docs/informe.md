@@ -1,3 +1,41 @@
+---
+title: "Arquitectura en la nube para la plataforma de comercio electrónico AndinaMarket"
+subtitle: "Guía de Laboratorio 7 — Computación en la Nube"
+lang: es
+toc-title: "Tabla de contenido"
+abstract-title: "Datos de la entrega"
+abstract: |
+  | | |
+  |---|---|
+  | **Universidad** | [verificar] |
+  | **Módulo** | Gestión de Recursos y Tolerancia a fallos — Eje temático: Computación en la Nube |
+  | **Integrantes y roles** | [verificar] (1) análisis y modelo de nube; (2) arquitectura y diagrama; (3) implementación y evidencias; (4) pruebas, costos y consolidación |
+  | **Docente** | [verificar] |
+  | **Fecha** | 31 de octubre de 2026 |
+  | **Repositorio** | `andina-market` (código, evidencias y fuentes de este informe) |
+---
+
+## 1. Introducción
+
+AndinaMarket S.A.S. es una empresa colombiana de comercio electrónico con sede en Bogotá: 180.000 usuarios registrados, 12.000 productos activos y 30.000 pedidos al mes en temporada normal. Su infraestructura propia presenta cuatro problemas: caídas cuando la demanda crece en temporada (hasta 300 req/s, 7,5 veces la carga nominal), interrupciones del servicio, costos fijos altos de servidores y riesgo sobre los datos de pago.
+
+Este informe propone y evalúa una arquitectura en la nube para gestionar usuarios, productos, pedidos, inventario y pagos con un objetivo de disponibilidad del 99,9 % mensual y un presupuesto de 250 USD/mes. La selección del modelo de servicio se justifica con una matriz ponderada. El diseño se valida con una demostración contenerizada que se somete a pruebas de autenticación, carga, falla y restauración, y su costo se estima con precios oficiales de AWS.
+
+El alcance cubre el diseño completo en AWS (contenedores administrados, base de datos administrada, almacenamiento de objetos, balanceo, seguridad y monitoreo) y una demostración local con Docker Compose, que la guía permite como entorno simulado. No incluye un despliegue en una cuenta de AWS, una pasarela de pago real ni el desarrollo de la interfaz web y móvil.
+
+**Palabras clave:** computación en la nube, sistemas distribuidos, contenedores administrados, escalabilidad, tolerancia a fallos.
+
+## 2. Objetivos
+
+**General.** Diseñar y validar una arquitectura en la nube para AndinaMarket que sostenga 300 req/s, ofrezca un 99,9 % de disponibilidad mensual y se ajuste a 250 USD/mes.
+
+**Específicos.**
+
+1. Especificar 4 requerimientos funcionales y 4 no funcionales con métrica, unidad y prueba de verificación.
+2. Seleccionar el modelo de servicio mediante una matriz ponderada con los 5 criterios de la guía.
+3. Implementar una demostración contenerizada de 4 servicios y medir su comportamiento ante carga, fallas y restauración.
+4. Estimar el costo mensual con precios oficiales de AWS en un escenario base y uno de temporada.
+
 ## 3. Requerimientos
 
 Los requerimientos responden a los cuatro problemas del caso: caídas en temporadas de alta demanda, interrupciones del servicio, costos fijos altos de servidores propios y riesgo de seguridad de los datos de pago. Las métricas usan los datos canónicos de AndinaMarket: 180.000 usuarios registrados, 12.000 SKU, carga nominal de 40 req/s y pico de temporada de 300 req/s.
@@ -55,8 +93,8 @@ La Tabla 4 evalúa cada modelo con los cinco criterios de la guía, expresando l
 
 | Modelo | Costos de infraestructura y mantenimiento | Facilidad de desarrollo y despliegue | Capacidad de escalamiento | Seguridad y control | Administración técnica |
 |---|---|---|---|---|---|
-| IaaS (EC2 autoadministrado) | Elimina la compra de servidores, pero mantiene el costo de horas de operación para parches y monitoreo de cada instancia. | El equipo debe construir la cadena de despliegue sobre máquinas virtuales antes de entregar funcionalidad. | Escala con grupos de instancias, pero el equipo debe construir y probar las imágenes de máquina y las reglas de escalado para la ráfaga de 600 req/s. | Control máximo del sistema operativo; el cliente responde por sus parches y su firewall (AWS, s.f.-a). | Alta: sin equipo de operaciones, el mantenimiento recae en los desarrolladores. |
-| PaaS / CaaS (ECS Fargate, RDS) | Pago por vCPU y memoria asignadas a cada tarea; sin servidores que mantener. | Se despliega la misma imagen Docker de la demo; CPU y memoria se declaran por tarea (AWS, s.f.-b). | Réplicas por servicio ajustables entre 2 y 10 según la carga, lo que cubre el pico de 300 req/s. | AWS gestiona servidores y parches del entorno; el cliente controla red, IAM, cifrado y código (AWS, s.f.-a). | Baja: no hay que aprovisionar ni escalar clústeres de máquinas virtuales (AWS, s.f.-b). |
+| IaaS (EC2 autoadministrado) | Elimina la compra de servidores, pero mantiene el costo de horas de operación para parches y monitoreo de cada instancia. | El equipo debe construir la cadena de despliegue sobre máquinas virtuales antes de entregar funcionalidad. | Escala con grupos de instancias, pero el equipo debe construir y probar las imágenes de máquina y las reglas de escalado para la ráfaga de 600 req/s. | Control máximo del sistema operativo; el cliente responde por sus parches y su firewall (Amazon Web Services [AWS], s.f.-l). | Alta: sin equipo de operaciones, el mantenimiento recae en los desarrolladores. |
+| PaaS / CaaS (ECS Fargate, RDS) | Pago por vCPU y memoria asignadas a cada tarea; sin servidores que mantener. | Se despliega la misma imagen Docker de la demo; CPU y memoria se declaran por tarea (AWS, s.f.-c). | Réplicas por servicio ajustables entre 2 y 10 según la carga, lo que cubre el pico de 300 req/s. | AWS gestiona servidores y parches del entorno; el cliente controla red, IAM, cifrado y código (AWS, s.f.-l). | Baja: no hay que aprovisionar ni escalar clústeres de máquinas virtuales (AWS, s.f.-c). |
 | SaaS (plataforma de e-commerce cerrada) | Pago por suscripción o por transacción según el proveedor, que crece con los 30.000 pedidos/mes y el 35 % de crecimiento anual. | Inmediata para funciones estándar; limitada para la reserva de stock con compensación (RF-04). | La escala el proveedor, sin control de AndinaMarket sobre umbrales ni réplicas. | Los datos de clientes y pedidos quedan bajo políticas del proveedor, con poco control de cifrado y auditoría. | Mínima, a cambio de depender del proveedor para cambios y migración. |
 
 PaaS/CaaS es el único modelo que combina baja carga de administración con control sobre la seguridad de los datos y la lógica propia de pedidos e inventario; IaaS exige operación que el equipo no tiene y SaaS cede el control de los datos de pago y de los flujos críticos.
@@ -76,7 +114,7 @@ Los pesos de la Tabla 5 priorizan escalamiento y administración técnica (25 % 
 | Administración técnica | 25 % | 1 | 4 | 5 |
 | **Resultado ponderado** | **100 %** | **2,65** | **4,25** | **3,60** |
 
-Se elige PaaS/CaaS: contenedores administrados en AWS ECS Fargate, base de datos RDS PostgreSQL Multi-AZ, archivos estáticos e imágenes en S3 servidos por CloudFront, balanceador ALB, secretos en Secrets Manager y observabilidad en CloudWatch. Fargate ejecuta las mismas imágenes Docker de la demostración sin administrar servidores (AWS, s.f.-b), y RDS Multi-AZ mantiene una instancia en espera en otra zona de disponibilidad para la conmutación por error (AWS, s.f.-c), lo que atiende RNF-01 y RNF-04 sin personal de operaciones.
+Se elige PaaS/CaaS: contenedores administrados en AWS ECS Fargate, base de datos RDS PostgreSQL Multi-AZ, archivos estáticos e imágenes en S3 servidos por CloudFront, balanceador ALB, secretos en Secrets Manager y observabilidad en CloudWatch. Fargate ejecuta las mismas imágenes Docker de la demostración sin administrar servidores (AWS, s.f.-c), y RDS Multi-AZ mantiene una instancia en espera en otra zona de disponibilidad para la conmutación por error (AWS, s.f.-i), lo que atiende RNF-01 y RNF-04 sin personal de operaciones.
 
 Se descarta IaaS puro porque su mayor control (5 en seguridad y control) no compensa el puntaje de 1 en administración técnica: el equipo tendría que parchar sistemas operativos y configurar el escalado de instancias, tareas que hoy causan los costos fijos y las interrupciones que el caso busca eliminar.
 
@@ -84,12 +122,12 @@ Se descarta SaaS cerrado porque la reserva de stock con compensación (RF-04), l
 
 **Modelo de despliegue.** Se usa nube pública en la región `us-east-1`, con los servicios de aplicación y datos en subredes privadas. La plataforma no almacena datos de tarjeta: el pago se delega a una pasarela externa, simulada en la demostración, y los datos personales se guardan cifrados en RDS y S3. Se descarta nube híbrida porque mantener servidores propios conservaría los costos fijos del caso y añadiría enlaces y operación en dos entornos sin un requisito regulatorio que lo exija.
 
-**Responsabilidad compartida.** AWS protege la infraestructura que ejecuta sus servicios y el cliente responde por lo que configura dentro de ellos, según el servicio utilizado (AWS, s.f.-a; AWS, s.f.-d):
+**Responsabilidad compartida.** AWS protege la infraestructura que ejecuta sus servicios y el cliente responde por lo que configura dentro de ellos, según el servicio utilizado (AWS, s.f.-l; AWS, s.f.-k):
 
 - Infraestructura física y red de AWS: responsabilidad de AWS.
-- Cómputo (Fargate): AWS mantiene y parcha el entorno de ejecución; AndinaMarket define imágenes, CPU, memoria y políticas IAM de cada tarea (AWS, s.f.-b).
-- Base de datos (RDS): AWS opera respaldos y replicación; AndinaMarket configura VPC, grupos de seguridad, TLS, cifrado en reposo y usuarios de la base (AWS, s.f.-d).
-- Almacenamiento (S3): AWS opera la plataforma; AndinaMarket clasifica los datos, elige el cifrado y fija permisos con IAM (AWS, s.f.-a).
+- Cómputo (Fargate): AWS mantiene y parcha el entorno de ejecución; AndinaMarket define imágenes, CPU, memoria y políticas IAM de cada tarea (AWS, s.f.-c).
+- Base de datos (RDS): AWS opera respaldos y replicación; AndinaMarket configura VPC, grupos de seguridad, TLS, cifrado en reposo y usuarios de la base (AWS, s.f.-k).
+- Almacenamiento (S3): AWS opera la plataforma; AndinaMarket clasifica los datos, elige el cifrado y fija permisos con IAM (AWS, s.f.-l).
 - Aplicación y datos: AndinaMarket responde por el código, la autenticación JWT, la autorización por rol y los datos de clientes.
 
 La Tabla 6 resume los servicios seleccionados y su rol en la solución.
@@ -128,13 +166,13 @@ La Tabla 7 justifica cada componente de la Figura 1 y registra la alternativa de
 |---|---|---|---|---|
 | CDN + WAF | Amazon CloudFront + AWS WAF | Entrega la interfaz y filtra tráfico malicioso antes de la VPC. | Descarga del ALB el contenido estático y bloquea ataques en el borde (RNF-02). | Servir la interfaz desde el ALB: consume capacidad de los servicios en temporada. |
 | Interfaz web y app | SPA en S3 | Interfaz para navegadores y móviles; mantiene el carrito en el cliente. | Archivos estáticos sin servidores que operar. | Renderizado en servidor: añade un quinto servicio que escalar. |
-| API Gateway / Balanceador | Application Load Balancer | Termina TLS, enruta por ruta (`/api/pedidos`…) y reparte entre réplicas. | Se integra con los servicios de ECS en Fargate (AWS, s.f.-b). | Amazon API Gateway: duplica el enrutamiento que ya hace el ALB. |
+| API Gateway / Balanceador | Application Load Balancer | Termina TLS, enruta por ruta (`/api/pedidos`…) y reparte entre réplicas. | Se integra con los servicios de ECS en Fargate (AWS, s.f.-c). | Amazon API Gateway: duplica el enrutamiento que ya hace el ALB. |
 | Servicio Usuarios | ECS Fargate | Registro, login, emisión de JWT y roles (RF-01). | Escala aparte del catálogo; el login no depende de pedidos. | Autenticación dentro de cada servicio: duplica la lógica de credenciales. |
 | Servicio Productos | ECS Fargate | Catálogo, búsqueda e imágenes (RF-02). | Recibe la mayor parte del tráfico de lectura y debe seguir activo si falla pedidos (RNF-01). | Unir catálogo y pedidos: una falla de pedidos tumbaría el catálogo. |
 | Servicio Pedidos | ECS Fargate | Crea pedidos, calcula totales y orquesta la reserva y el pago (RF-03). | Concentra la carga de escritura del pico; escala de forma independiente (RNF-04). | Orquestación en la interfaz: el total quedaría en manos del cliente. |
 | Servicio Inventario | ECS Fargate | Existencias, reserva y liberación por SKU (RF-04). | Una sola fuente de verdad del stock evita sobreventa con reserva transaccional. | Descontar stock desde pedidos: rompería el aislamiento por dominio. |
-| Base de datos | RDS PostgreSQL Multi-AZ | Persistencia con un esquema por dominio (`usuarios`, `catalogo`, `pedidos`, `inventario`). | Réplica síncrona en otra zona con conmutación automática (AWS, s.f.-e); transacciones para la reserva. | DynamoDB: la reserva con `SELECT ... FOR UPDATE` y `CHECK` exige un modelo relacional. |
-| Almacenamiento de archivos | Amazon S3 | Imágenes de producto, interfaz web y respaldos. | Servicio administrado; el cliente decide cifrado y permisos (AWS, s.f.-a). | Volumen de disco en los contenedores: se pierde al reemplazar una tarea. |
+| Base de datos | RDS PostgreSQL Multi-AZ | Persistencia con un esquema por dominio (`usuarios`, `catalogo`, `pedidos`, `inventario`). | Réplica síncrona en otra zona con conmutación automática (AWS, s.f.-i); transacciones para la reserva. | DynamoDB: la reserva con `SELECT ... FOR UPDATE` y `CHECK` exige un modelo relacional. |
+| Almacenamiento de archivos | Amazon S3 | Imágenes de producto, interfaz web y respaldos. | Servicio administrado; el cliente decide cifrado y permisos (AWS, s.f.-l). | Volumen de disco en los contenedores: se pierde al reemplazar una tarea. |
 | Cola de pagos | Amazon SQS | Desacopla el pedido de la respuesta de la pasarela externa. | Si la pasarela tarda o falla, el pedido no se pierde y se reintenta. | Llamada síncrona: un pago lento bloquea la creación de pedidos en el pico. |
 | Seguridad y control de acceso | AWS IAM + Secrets Manager + JWT | Permisos mínimos por tarea, custodia de secretos y autorización por rol. | El secreto JWT y las credenciales de RDS no viven en el código ni en la imagen. | Variables de entorno en la definición de tarea: el secreto queda visible en la configuración. |
 | Monitoreo y registros | Amazon CloudWatch | Métricas, logs y alarmas de los cuatro servicios y de RDS. | Integrado con ECS y RDS, sin servidores de monitoreo propios. | Prometheus y Grafana autogestionados: se usan en la demo, pero en producción exigen operarlos. |
@@ -169,15 +207,15 @@ La Tabla 7 justifica cada componente de la Figura 1 y registra la alternativa de
 | Caen todas las tareas del Servicio Pedidos | No se pueden crear ni pagar pedidos; el catálogo y el login siguen disponibles. | Servicios independientes detrás del ALB (degradación controlada, RNF-01). | Hasta que ECS levanta nuevas tareas; se mide en la demo (§7.4). |
 | Falla el Servicio Inventario | El catálogo responde con `stock: null`; no se pueden crear pedidos. | Tiempo límite de 500 ms en Productos y respuesta de respaldo. | Igual que la recuperación de una tarea de ECS. |
 | La Cola SQS: pagos no está disponible | Los pedidos quedan en estado `creado` sin procesar el pago. | El pedido y la reserva ya están persistidos; la solicitud de pago se reintenta. | Depende de AWS; no lo controla AndinaMarket. |
-| RDS pierde la zona primaria | Errores de conexión durante la conmutación; luego el servicio se reanuda. | Conmutación automática a la réplica en espera; los servicios deben reconectarse (AWS, s.f.-f). | Típicamente 60–120 s (AWS, s.f.-f). |
+| RDS pierde la zona primaria | Errores de conexión durante la conmutación; luego el servicio se reanuda. | Conmutación automática a la réplica en espera; los servicios deben reconectarse (AWS, s.f.-h). | Típicamente 60–120 s (AWS, s.f.-h). |
 
-**Flujo de respaldo.** RDS sube los registros de transacciones a S3 cada cinco minutos y permite restaurar a cualquier instante dentro del periodo de retención (AWS, s.f.-g), lo que cumple el RPO de 15 min de RNF-01. Se respaldan:
+**Flujo de respaldo.** RDS sube los registros de transacciones a S3 cada cinco minutos y permite restaurar a cualquier instante dentro del periodo de retención (AWS, s.f.-j), lo que cumple el RPO de 15 min de RNF-01. Se respaldan:
 
 - La base de datos completa, con respaldos automáticos diarios y registros de transacciones; retención de 30 días.
 - Una copia lógica diaria (`pg_dump`) en el bucket S3 de respaldos, independiente del mecanismo de RDS.
 - Las imágenes de producto en S3, con versionado de objetos.
 
-La restauración crea una instancia nueva a partir del instante elegido, sin modificar la original (AWS, s.f.-g). Después se actualiza el endpoint de conexión en Secrets Manager y se reinician las tareas de ECS. Cada mes se ensaya la restauración midiendo su duración frente al RTO de 4 h; en la demo se ensaya con `scripts/respaldo.sh` (§7.3).
+La restauración crea una instancia nueva a partir del instante elegido, sin modificar la original (AWS, s.f.-j). Después se actualiza el endpoint de conexión en Secrets Manager y se reinician las tareas de ECS. Cada mes se ensaya la restauración midiendo su duración frente al RTO de 4 h; en la demo se ensaya con `scripts/respaldo.sh` (§7.3).
 
 ## 6. Implementación y pruebas de validación
 
@@ -217,18 +255,18 @@ La Tabla 10 traduce cada pieza de la demo a su recurso de AWS.
 
 | Pieza de la demo | Equivalente en AWS | Configuración clave | Qué cambia al pasar a producción |
 |---|---|---|---|
-| `docker-compose.yml` (un servicio por dominio) | ECS Task Definition por servicio | Imagen en ECR, `FARGATE`, CPU y memoria por tarea, rol IAM de tarea, logs a CloudWatch (AWS, s.f.-h) | Los secretos salen de Secrets Manager en vez de `.env`. |
-| `docker compose up --scale pedidos=3` | ECS Service con `desiredCount` | El servicio mantiene el número deseado de tareas y reemplaza las que fallan (AWS, s.f.-i) | El número de tareas lo ajusta Service Auto Scaling, no un comando manual. |
-| Nginx (TLS, rutas, reparto) | Application Load Balancer + target groups tipo `ip` | Reglas por ruta `/api/*`, health check `/health` (AWS, s.f.-b) | Certificado de ACM en vez del autofirmado; el rate limit pasa a AWS WAF. |
-| PostgreSQL local | RDS PostgreSQL Multi-AZ | Réplica síncrona en otra zona (AWS, s.f.-e) | Conmutación automática en 60–120 s (AWS, s.f.-f) y PITR. |
+| `docker-compose.yml` (un servicio por dominio) | ECS Task Definition por servicio | Imagen en ECR, `FARGATE`, CPU y memoria por tarea, rol IAM de tarea, logs a CloudWatch (AWS, s.f.-b) | Los secretos salen de Secrets Manager en vez de `.env`. |
+| `docker compose up --scale pedidos=3` | ECS Service con `desiredCount` | El servicio mantiene el número deseado de tareas y reemplaza las que fallan (AWS, s.f.-a) | El número de tareas lo ajusta Service Auto Scaling, no un comando manual. |
+| Nginx (TLS, rutas, reparto) | Application Load Balancer + target groups tipo `ip` | Reglas por ruta `/api/*`, health check `/health` (AWS, s.f.-c) | Certificado de ACM en vez del autofirmado; el rate limit pasa a AWS WAF. |
+| PostgreSQL local | RDS PostgreSQL Multi-AZ | Réplica síncrona en otra zona (AWS, s.f.-i) | Conmutación automática en 60–120 s (AWS, s.f.-h) y PITR. |
 | Volumen `objetos` | Amazon S3 | Buckets `productos` y `respaldos`, URL prefirmadas | Cifrado en reposo, versionado y ciclo de vida. |
-| Prometheus y Grafana | Amazon CloudWatch | Métricas de servicio ECS y ALB, alarmas (AWS, s.f.-j) | Sin servidores de monitoreo propios. |
+| Prometheus y Grafana | Amazon CloudWatch | Métricas del ALB por target group, alarmas (AWS, s.f.-d) | Sin servidores de monitoreo propios. |
 
-**Autoescalado objetivo.** Cada servicio usa ECS Service Auto Scaling con dos políticas de seguimiento de objetivo (AWS, s.f.-k): CPU media del 60 % y `ALBRequestCountPerTarget`, que mide el promedio de solicitudes por target y se reporta cada 60 s (AWS, s.f.-l). El rango es de 2 a 10 tareas por servicio. En la demo, una réplica de productos con una de inventario sostuvo unas 30 consultas de catálogo exitosas por segundo con inventario al 85 % de un núcleo (Tabla 12). Con el objetivo del 60 %, cada tarea debería recibir unas 18 req/s (≈ 1.080 solicitudes por minuto por target).
+**Autoescalado objetivo.** Cada servicio usa ECS Service Auto Scaling con dos políticas de seguimiento de objetivo (AWS, s.f.-m): CPU media del 60 % y `ALBRequestCountPerTarget`, que mide el promedio de solicitudes por target y se reporta cada 60 s (AWS, s.f.-d). El rango es de 2 a 10 tareas por servicio. En la demo, una réplica de productos con una de inventario sostuvo unas 30 consultas de catálogo exitosas por segundo con inventario al 85 % de un núcleo (Tabla 12). Con el objetivo del 60 %, cada tarea debería recibir unas 18 req/s (≈ 1.080 solicitudes por minuto por target).
 
 El pico canónico de 300 req/s incluye un 90 % de catálogo, es decir 270 req/s. A 18 req/s por tarea se necesitarían 15 tareas de productos, por encima del máximo de 10. Para pedidos, el 10 % del pico (30 req/s) cabe en el mínimo de 2 tareas, que en la demo no pasaron del 6 % de CPU. Esta capacidad se midió en el equipo local y debe recalibrarse en Fargate.
 
-**ECS Fargate frente a EKS.** EKS ofrece la portabilidad de Kubernetes, pero exige operar el clúster: versiones, complementos y manifiestos. Para un equipo sin personal de operaciones, ese costo contradice el criterio de administración técnica que más pesa en la Tabla 5. Fargate ejecuta las mismas imágenes sin administrar servidores ni clústeres (AWS, s.f.-b) y se integra de forma nativa con el ALB y Service Auto Scaling. Kubernetes queda como alternativa si el número de servicios crece o si se requiere portabilidad entre nubes.
+**ECS Fargate frente a EKS.** EKS ofrece la portabilidad de Kubernetes, pero exige operar el clúster: versiones, complementos y manifiestos. Para un equipo sin personal de operaciones, ese costo contradice el criterio de administración técnica que más pesa en la Tabla 5. Fargate ejecuta las mismas imágenes sin administrar servidores ni clústeres (AWS, s.f.-c) y se integra de forma nativa con el ALB y Service Auto Scaling. Kubernetes queda como alternativa si el número de servicios crece o si se requiere portabilidad entre nubes.
 
 ### 6.4 Resultados
 
@@ -274,24 +312,7 @@ La causa es que el cuello de botella está en productos e inventario, cada uno c
 
 ### 6.6 Evidencias
 
-La Tabla 13 indexa cada evidencia con la figura o tabla que la cita.
-
-**Tabla 13.** Índice de evidencias.
-
-| Figura/Tabla | Archivo en `docs/evidencias` | Qué demuestra |
-|---|---|---|
-| Figura 1 | `f3-01-arquitectura.png` | Arquitectura con los 7 elementos exigidos |
-| Figura 2 | `f4-01-demo.png` | Contenedores de la demo |
-| Figura 3 | `f4-05-grafana.png` | Dashboard con RPS, p95, 5xx y CPU/memoria bajo tráfico real |
-| Tabla 11 | `f4-06-humo.txt` | Flujo completo y descuento exacto de stock |
-| Tablas 11 y 11 | `f4-07-carga-1-replica.txt`, `f4-08-carga-3-replicas.txt` | Prueba de carga con 1 y 3 réplicas |
-| Tabla 12 | `f4-10-escalado-distribucion.txt` | Tres réplicas activas y reparto de solicitudes |
-| Tabla 11 | `f4-09-restauracion.txt` | Restauración con el mismo ID de pedido |
-| Tablas 11 y 16 | `f4-11-fallas-y-consumo.txt` | Degradación ante caída de servicios y de una réplica; consumo en reposo |
-| §7.2 | `f5-02-cifrado-transito.txt` | TLS 1.3/1.2, redirección, cabeceras y hash de contraseñas |
-| §9 | `f4-12-primera-corrida-carga.txt` | Primera corrida de carga: límite de 512 conexiones del gateway |
-
-La Figura 3 muestra el dashboard de Grafana durante una ráfaga de tráfico real, con los cuatro paneles que exige la Tarea 4.6.
+Cada evidencia citada en este informe está en `docs/evidencias/` y se indexa en el Anexo A (Tabla A1). La Figura 3 muestra el dashboard de Grafana durante una ráfaga de tráfico real, con sus cuatro paneles: solicitudes por segundo, latencia p95, tasa de errores 5xx y CPU/memoria por contenedor.
 
 ![Figura 3. Dashboard de observabilidad con tráfico real.](evidencias/f4-05-grafana.png)
 
@@ -301,9 +322,9 @@ La Figura 3 muestra el dashboard de Grafana durante una ráfaga de tráfico real
 
 ### 7.1 Control de acceso
 
-La Tabla 14 resume quién puede invocar cada recurso de la API y dónde se aplica el control. La autorización se resuelve con el claim `rol` del JWT (15 min) y, para las operaciones internas de inventario, con la cabecera `X-Service-Token`; el gateway rechaza esas rutas desde fuera con 403.
+La Tabla 13 resume quién puede invocar cada recurso de la API y dónde se aplica el control. La autorización se resuelve con el claim `rol` del JWT (15 min) y, para las operaciones internas de inventario, con la cabecera `X-Service-Token`; el gateway rechaza esas rutas desde fuera con 403.
 
-**Tabla 14.** Matriz de autorización (✔ permitido, ✘ denegado).
+**Tabla 13.** Matriz de autorización (✔ permitido, ✘ denegado).
 
 | Recurso | Público | Cliente | Admin | Servicio interno | Dónde se aplica |
 |---|---|---|---|---|---|
@@ -318,9 +339,9 @@ La Tabla 14 resume quién puede invocar cada recurso de la API y dónde se aplic
 
 En el gateway se limita cada IP a 10 req/s con ráfaga de 20 y se responde 429 al exceder; el umbral de la demo protege contra abuso desde una sola IP, y en producción se ajustaría al tráfico real por usuario en AWS WAF. El tráfico externo solo se acepta por HTTPS (TLS 1.2 y 1.3; el puerto HTTP redirige con 301) y cada respuesta incluye las cabeceras `Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options: DENY` y `Referrer-Policy`.
 
-La Tabla 15 relaciona las amenazas principales del caso con el control que las mitiga y su categoría en el OWASP Top 10:2021 (OWASP Foundation, 2021).
+La Tabla 14 relaciona las amenazas principales del caso con el control que las mitiga y su categoría en el OWASP Top 10:2021 (OWASP Foundation, 2021).
 
-**Tabla 15.** Amenazas y controles.
+**Tabla 14.** Amenazas y controles.
 
 | Amenaza | Control en la demo | Control en producción | OWASP 2021 |
 |---|---|---|---|
@@ -334,15 +355,15 @@ La Tabla 15 relaciona las amenazas principales del caso con el control que las m
 **Responsabilidad compartida aplicada.**
 
 - **IAM:** AWS opera el servicio de identidades. AndinaMarket define un rol por tarea con acceso solo a sus secretos y a su cola, y exige MFA a los operadores.
-- **RDS:** AWS parcha el motor y opera respaldos y réplica. AndinaMarket configura el grupo de seguridad, TLS, cifrado en reposo y un usuario por esquema (AWS, s.f.-d).
-- **S3:** AWS cifra por defecto todo objeto nuevo con SSE-S3 (AWS, s.f.-m). AndinaMarket bloquea el acceso público y solo entrega imágenes por CloudFront o con URL prefirmadas.
+- **RDS:** AWS parcha el motor y opera respaldos y réplica. AndinaMarket configura el grupo de seguridad, TLS, cifrado en reposo y un usuario por esquema (AWS, s.f.-k).
+- **S3:** AWS cifra por defecto todo objeto nuevo con SSE-S3 (AWS, s.f.-e). AndinaMarket bloquea el acceso público y solo entrega imágenes por CloudFront o con URL prefirmadas.
 - **Aplicación:** responsabilidad completa de AndinaMarket: código, dependencias, validación de entrada, JWT y autorización por rol.
 
 ### 7.2 Cifrado y gestión de secretos
 
 **En tránsito.** El gateway de la demo negocia TLS 1.3 (`TLS_AES_256_GCM_SHA384`), acepta TLS 1.2 y no habilita versiones anteriores. El puerto HTTP redirige con 301 y cada respuesta lleva HSTS (`f5-02-cifrado-transito.txt`). El certificado es autofirmado; en producción, ACM emite el certificado de CloudFront y del ALB.
 
-**En reposo.** RDS cifra con AES-256 la instancia y sus snapshots (AWS, s.f.-d), y S3 aplica SSE-S3 sin costo adicional desde el 5 de enero de 2023 (AWS, s.f.-m). La demo no cifra el volumen local de PostgreSQL, que es una de las brechas de la Tabla 11. Las contraseñas nunca se guardan en claro: se almacena su hash bcrypt de costo 12.
+**En reposo.** RDS cifra con AES-256 la instancia y sus snapshots (AWS, s.f.-k), y S3 aplica SSE-S3 sin costo adicional desde el 5 de enero de 2023 (AWS, s.f.-e). La demo no cifra el volumen local de PostgreSQL, que es una de las brechas de la Tabla 11. Las contraseñas nunca se guardan en claro: se almacena su hash bcrypt de costo 12.
 
 **Secretos.** En la demo, `JWT_SECRET`, `SERVICE_TOKEN` y las contraseñas viven en `.env`, que Git ignora; el repositorio solo contiene `.env.example` con `cambiar_esto`. En producción cada secreto se guarda en Secrets Manager: las credenciales de RDS (una por servicio), el secreto JWT y el token entre servicios. ECS los inyecta en la tarea al arrancar mediante el rol IAM, de modo que no aparecen en la imagen, en la definición de tarea ni en el repositorio.
 
@@ -352,19 +373,19 @@ En la demo, `scripts/respaldo.sh` genera un `pg_dump` comprimido con marca de ti
 
 En producción se proponen tres medidas:
 
-- **Frecuencia:** respaldos automáticos de RDS con PITR. RDS sube los registros de transacciones a S3 cada 5 min (AWS, s.f.-g), lo que deja la pérdida máxima por debajo del RPO de 15 min de RNF-01. Además, un `pg_dump` diario se guarda en S3 como copia lógica independiente.
+- **Frecuencia:** respaldos automáticos de RDS con PITR. RDS sube los registros de transacciones a S3 cada 5 min (AWS, s.f.-j), lo que deja la pérdida máxima por debajo del RPO de 15 min de RNF-01. Además, un `pg_dump` diario se guarda en S3 como copia lógica independiente.
 - **Retención:** 30 días para los respaldos automáticos y las copias lógicas.
-- **Verificación:** cada mes se restaura en una instancia nueva, sin tocar la original (AWS, s.f.-g), y se mide el tiempo total. Ese tiempo incluye restaurar, actualizar el endpoint en Secrets Manager y reiniciar las tareas de ECS, y debe quedar por debajo del RTO de 4 h. La restauración local de 554 ms solo valida el procedimiento; el tiempo real depende del tamaño de la base y de la instancia.
+- **Verificación:** cada mes se restaura en una instancia nueva, sin tocar la original (AWS, s.f.-j), y se mide el tiempo total. Ese tiempo incluye restaurar, actualizar el endpoint en Secrets Manager y reiniciar las tareas de ECS, y debe quedar por debajo del RTO de 4 h. La restauración local de 554 ms solo valida el procedimiento; el tiempo real depende del tamaño de la base y de la instancia.
 
 ### 7.4 Disponibilidad y comportamiento ante fallos
 
-La Tabla 16 resume cinco escenarios de falla. Tres se reprodujeron en la demo deteniendo contenedores, uno con la prueba de carga y uno con las pruebas automatizadas.
+La Tabla 15 resume cinco escenarios de falla. Tres se reprodujeron en la demo deteniendo contenedores, uno con la prueba de carga y uno con las pruebas automatizadas.
 
-**Tabla 16.** Escenarios de falla.
+**Tabla 15.** Escenarios de falla.
 
 | Falla simulada | Cómo se reprodujo en la demo | Efecto observado | Mecanismo que lo mitiga | Recuperación esperada |
 |---|---|---|---|---|
-| Caída del servicio de pedidos | `docker compose stop pedidos` | Catálogo 200 en 23 ms; `POST /api/pedidos` 502 en 3,9 s; volvió a healthy en 12,4 s | Servicios independientes; ECS reemplaza tareas (AWS, s.f.-i) | Lo que tarde ECS en lanzar una tarea nueva; en la demo, 12,4 s |
+| Caída del servicio de pedidos | `docker compose stop pedidos` | Catálogo 200 en 23 ms; `POST /api/pedidos` 502 en 3,9 s; volvió a healthy en 12,4 s | Servicios independientes; ECS reemplaza tareas (AWS, s.f.-a) | Lo que tarde ECS en lanzar una tarea nueva; en la demo, 12,4 s |
 | Caída de una réplica de pedidos | `docker kill` de 1 de 3 réplicas con tráfico de 4 req/s | 60 de 60 solicitudes con 200; la réplica no se reinició sola | Reparto entre réplicas; en ECS, el `desiredCount` repone la tarea | Sin interrupción visible |
 | Caída de inventario | `docker compose stop inventario` | Catálogo 200 con `stock: null` en 509 ms; healthy de nuevo en 11,5 s | Timeout de 500 ms y valor de respaldo en productos | Igual a la caída de pedidos |
 | Saturación de carga | k6 hasta 200 req/s | 63 req/s procesadas; 42,6 % de errores (504) | Autoescalado del servicio que satura (§6.3) | Depende de que escale productos e inventario |
@@ -372,17 +393,17 @@ La Tabla 16 resume cinco escenarios de falla. Tres se reprodujeron en la demo de
 
 Fuente: `f4-11-fallas-y-consumo.txt`, `f4-08-carga-3-replicas.txt` y pruebas de pedidos.
 
-**Autoescalado propuesto.** Cada servicio usa ECS Service Auto Scaling, no el HPA de Kubernetes, con dos políticas de seguimiento de objetivo: CPU media del 60 % y `ALBRequestCountPerTarget` (AWS, s.f.-k). El rango es de 2 a 10 tareas y el cálculo de capacidad está en §6.3. El mínimo de 1 réplica que usa la demo no cumple RNF-01: con una sola tarea, su caída deja el servicio sin respuesta durante unos 12 s, como se midió en la caída de pedidos. Además, una tarea vive en una sola zona, así que una falla de zona la elimina. Con 2 tareas en zonas distintas, el ALB sigue enviando tráfico a la sobreviviente mientras ECS repone la otra.
+**Autoescalado propuesto.** Cada servicio usa ECS Service Auto Scaling, no el HPA de Kubernetes, con dos políticas de seguimiento de objetivo: CPU media del 60 % y `ALBRequestCountPerTarget` (AWS, s.f.-m). El rango es de 2 a 10 tareas y el cálculo de capacidad está en §6.3. El mínimo de 1 réplica que usa la demo no cumple RNF-01: con una sola tarea, su caída deja el servicio sin respuesta durante unos 12 s, como se midió en la caída de pedidos. Además, una tarea vive en una sola zona, así que una falla de zona la elimina. Con 2 tareas en zonas distintas, el ALB sigue enviando tráfico a la sobreviviente mientras ECS repone la otra.
 
-**Despliegue sin caída.** Se usa el despliegue rolling de ECS con `minimumHealthyPercent` = 100 y `maximumPercent` = 200. Con 2 tareas deseadas, ECS arranca las nuevas antes de detener las viejas, y solo pasa tráfico a una tarea cuando supera el health check `/health` del ALB. Al retirar una tarea, el ALB deja de enviarle solicitudes y espera a que terminen las que están en curso; por defecto espera hasta 300 s (AWS, s.f.-o), un valor que conviene bajar a unos 30 s porque las solicitudes de la API duran menos de 5 s. Si las tareas nuevas no arrancan, el circuit breaker de despliegue revierte a la revisión anterior (AWS, s.f.-n).
+**Despliegue sin caída.** Se usa el despliegue rolling de ECS con `minimumHealthyPercent` = 100 y `maximumPercent` = 200. Con 2 tareas deseadas, ECS arranca las nuevas antes de detener las viejas, y solo pasa tráfico a una tarea cuando supera el health check `/health` del ALB. Al retirar una tarea, el ALB deja de enviarle solicitudes y espera a que terminen las que están en curso; por defecto espera hasta 300 s (AWS, s.f.-g), un valor que conviene bajar a unos 30 s porque las solicitudes de la API duran menos de 5 s. Si las tareas nuevas no arrancan, el circuit breaker de despliegue revierte a la revisión anterior (AWS, s.f.-f).
 
 Este esquema tiene límites. No protege contra un cambio de esquema de base de datos incompatible con la versión anterior, porque ambas versiones conviven durante el despliegue y comparten la base. Tampoco detecta errores de lógica que pasan el health check; para eso se requieren alarmas de aplicación sobre la tasa de 5xx.
 
 ### 7.5 Monitoreo propuesto en producción
 
-La Tabla 17 define las alarmas de CloudWatch. La primera traslada a producción la regla `LatenciaP95Alta` que la demo ya evalúa en Prometheus (`observabilidad/alertas.yml`): p95 por servicio mayor que 800 ms durante 2 min.
+La Tabla 16 define las alarmas de CloudWatch. La primera traslada a producción la regla `LatenciaP95Alta` que la demo ya evalúa en Prometheus (`observabilidad/alertas.yml`): p95 por servicio mayor que 800 ms durante 2 min.
 
-**Tabla 17.** Alarmas de monitoreo.
+**Tabla 16.** Alarmas de monitoreo.
 
 | Métrica | Umbral | Acción | Severidad |
 |---|---|---|---|
@@ -410,9 +431,9 @@ El cálculo detallado, con cantidades, precio unitario y fuente por línea, est�
 - 4 servicios × 2 tareas de 0,5 vCPU y 1 GB.
 - Logs de 1 KB por solicitud, con retención de 30 días.
 
-La Tabla 18 agrupa el resultado por componente.
+La Tabla 17 agrupa el resultado por componente.
 
-**Tabla 18.** Costo mensual estimado (USD).
+**Tabla 17.** Costo mensual estimado (USD).
 
 | Componente | Base (~40 req/s) | Incremento en temporada (300 req/s, 2 h/día) |
 |---|---|---|
@@ -434,8 +455,77 @@ Con ellas el base queda en 341,48 USD/mes, aún 91,48 USD (37 %) por encima del 
 
 ## 9. Conclusiones
 
-**Beneficio: la elasticidad por servicio funciona, pero solo donde está la carga.** La separación en servicios independientes permitió escalar pedidos de una a tres réplicas sin reiniciar el gateway. La carga se repartió en 402, 402 y 398 solicitudes por réplica. Los pedidos exitosos subieron de 72,7 % a 88,6 % y la latencia media de creación bajó 39 % (Tabla 12). Al matar una de las tres réplicas con tráfico activo, las 60 solicitudes siguientes respondieron 200 (Tabla 16). Este es el beneficio concreto que ofrece una plataforma de contenedores administrados frente a los servidores propios de AndinaMarket: cada dominio crece por separado y la falla de una instancia no interrumpe el servicio. El mismo experimento mostró el límite del beneficio: el rendimiento global no pasó de 63 req/s porque se escaló un servicio que no estaba saturado. La elasticidad solo mejora el sistema cuando se aplica, guiada por métricas, al componente que limita.
+**Beneficio: la elasticidad por servicio funciona, pero solo donde está la carga.** La separación en servicios independientes permitió escalar pedidos de una a tres réplicas sin reiniciar el gateway. La carga se repartió en 402, 402 y 398 solicitudes por réplica. Los pedidos exitosos subieron de 72,7 % a 88,6 % y la latencia media de creación bajó 39 % (Tabla 12). Al matar una de las tres réplicas con tráfico activo, las 60 solicitudes siguientes respondieron 200 (Tabla 15). Este es el beneficio concreto que ofrece una plataforma de contenedores administrados frente a los servidores propios de AndinaMarket: cada dominio crece por separado y la falla de una instancia no interrumpe el servicio. El mismo experimento mostró el límite del beneficio: el rendimiento global no pasó de 63 req/s porque se escaló un servicio que no estaba saturado. La elasticidad solo mejora el sistema cuando se aplica, guiada por métricas, al componente que limita.
 
 **Limitación: la demo local y la estimación de costos dependen de supuestos que la nube real puede invalidar.** La demo corrió en un solo equipo de 20 CPU, sin latencia de red hacia Colombia, sin Multi-AZ y con el generador de carga compitiendo por los mismos núcleos (§6.5). Por eso, la capacidad medida (unas 30 consultas de catálogo por segundo por réplica) no se puede trasladar directamente a una tarea de Fargate y debe recalibrarse. Lo mismo ocurre con el costo: 425,86 USD/mes en el escenario base, 341,48 USD con optimizaciones, frente a un presupuesto de 250 USD. El 79 % del incremento en temporada depende de cuántas solicitudes llegan a CloudFront, WAF y los logs, cifras que en este trabajo son supuestos y no mediciones. Migrar a la nube no garantiza ahorro: el costo final depende de decisiones de seguridad (VPC endpoints, WAF) que el equipo debe validar con tráfico real.
 
 **Desafío: en un sistema distribuido, la falla aparece en la interacción entre componentes y no en cada uno por separado.** Las 30 pruebas automatizadas pasaron, pero en la primera prueba de carga falló el 30,34 % de las solicitudes (`f4-12-primera-corrida-carga.txt`) por un límite del gateway que ninguna prueba aislada revelaba: 512 conexiones por defecto en Nginx. Corregido ese límite, apareció el siguiente cuello de botella. Cada listado de productos hace cinco consultas a inventario, lo que saturó ese servicio al 85–89 % de un núcleo y produjo 4.939 respuestas 504 en la medición B. Diagnosticarlo exigió cruzar logs de Nginx y de cada servicio por marca de tiempo, porque los servicios no comparten un identificador de correlación. La consistencia entre reserva de stock y pedido también exigió diseño explícito: compensación ante fallos y un orden de escritura correcto para la idempotencia. El desafío es diseñar desde el inicio la observabilidad y los contratos entre servicios.
+
+
+## 10. Referencias
+
+Amazon Web Services. (s.f.-a). *Amazon ECS services*. Amazon Elastic Container Service Developer Guide. Recuperado el 31 de octubre de 2026, de https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs_services.html
+
+Amazon Web Services. (s.f.-b). *Amazon ECS task definitions*. Amazon Elastic Container Service Developer Guide. Recuperado el 31 de octubre de 2026, de https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definitions.html
+
+Amazon Web Services. (s.f.-c). *Architect for AWS Fargate for Amazon ECS*. Amazon Elastic Container Service Developer Guide. Recuperado el 31 de octubre de 2026, de https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html
+
+Amazon Web Services. (s.f.-d). *CloudWatch metrics for your Application Load Balancer*. Elastic Load Balancing User Guide. Recuperado el 31 de octubre de 2026, de https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html
+
+Amazon Web Services. (s.f.-e). *Default encryption FAQ*. Amazon Simple Storage Service User Guide. Recuperado el 31 de octubre de 2026, de https://docs.aws.amazon.com/AmazonS3/latest/userguide/default-encryption-faq.html
+
+Amazon Web Services. (s.f.-f). *Deploy Amazon ECS services by replacing tasks*. Amazon Elastic Container Service Developer Guide. Recuperado el 31 de octubre de 2026, de https://docs.aws.amazon.com/AmazonECS/latest/developerguide/deployment-type-ecs.html
+
+Amazon Web Services. (s.f.-g). *Edit target group attributes for your Application Load Balancer*. Elastic Load Balancing User Guide. Recuperado el 31 de octubre de 2026, de https://docs.aws.amazon.com/elasticloadbalancing/latest/application/edit-target-group-attributes.html
+
+Amazon Web Services. (s.f.-h). *Failing over a Multi-AZ DB instance for Amazon RDS*. Amazon Relational Database Service User Guide. Recuperado el 31 de octubre de 2026, de https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZ.Failover.html
+
+Amazon Web Services. (s.f.-i). *Multi-AZ DB instance deployments for Amazon RDS*. Amazon Relational Database Service User Guide. Recuperado el 31 de octubre de 2026, de https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZSingleStandby.html
+
+Amazon Web Services. (s.f.-j). *Restoring a DB instance to a specified time for Amazon RDS*. Amazon Relational Database Service User Guide. Recuperado el 31 de octubre de 2026, de https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PIT.html
+
+Amazon Web Services. (s.f.-k). *Security in Amazon RDS*. Amazon Relational Database Service User Guide. Recuperado el 31 de octubre de 2026, de https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.html
+
+Amazon Web Services. (s.f.-l). *Shared responsibility model*. Recuperado el 31 de octubre de 2026, de https://aws.amazon.com/compliance/shared-responsibility-model/
+
+Amazon Web Services. (s.f.-m). *Use a target metric to scale Amazon ECS services*. Amazon Elastic Container Service Developer Guide. Recuperado el 31 de octubre de 2026, de https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-autoscaling-targettracking.html
+
+Amazon Web Services. (2026). *AWS Price List API* [Conjunto de datos]. Recuperado el 31 de octubre de 2026, de https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/index.json
+
+OWASP Foundation. (2021). *OWASP Top 10:2021*. Recuperado el 31 de octubre de 2026, de https://top10.owasp.org/2021
+
+## 11. Anexos
+
+### Anexo A. Índice de evidencias
+
+**Tabla A1.** Índice de evidencias.
+
+| Figura/Tabla | Archivo en `docs/evidencias` | Qué demuestra |
+|---|---|---|
+| Figura 1 | `f3-01-arquitectura.png` | Arquitectura con los 7 elementos exigidos |
+| Figura 2 | `f4-01-demo.png` | Contenedores de la demo |
+| Figura 3 | `f4-05-grafana.png` | Dashboard con RPS, p95, 5xx y CPU/memoria bajo tráfico real |
+| Tabla 11 | `f4-06-humo.txt` | Flujo completo y descuento exacto de stock |
+| Tablas 11 y 11 | `f4-07-carga-1-replica.txt`, `f4-08-carga-3-replicas.txt` | Prueba de carga con 1 y 3 réplicas |
+| Tabla 12 | `f4-10-escalado-distribucion.txt` | Tres réplicas activas y reparto de solicitudes |
+| Tabla 11 | `f4-09-restauracion.txt` | Restauración con el mismo ID de pedido |
+| Tablas 11 y 15 | `f4-11-fallas-y-consumo.txt` | Degradación ante caída de servicios y de una réplica; consumo en reposo |
+| §7.2 | `f5-02-cifrado-transito.txt` | TLS 1.3/1.2, redirección, cabeceras y hash de contraseñas |
+| §9 | `f4-12-primera-corrida-carga.txt` | Primera corrida de carga: límite de 512 conexiones del gateway |
+| Tabla 11 | `f4-13-pytest.txt` | 30 pruebas automatizadas de los 4 servicios en verde |
+
+### Anexo B. Reproducción de la demostración
+
+Requisitos: Docker 24 o superior con Docker Compose, 4 GB de RAM libres, `curl` y `python3`. Desde la raíz del repositorio:
+
+```bash
+cp .env.example .env                                   # reemplazar los valores cambiar_esto
+docker compose up -d --wait                            # arranca 9 contenedores y genera el certificado TLS
+bash scripts/humo.sh                                   # flujo completo; termina con "OK" y código 0
+for s in usuarios productos inventario pedidos; do docker compose run --rm $s pytest -q; done
+bash scripts/escalar.sh                                # carga con 1 y 3 réplicas de pedidos (~8 min)
+bash scripts/respaldo.sh --probar                      # respaldo, borrado y restauración verificada
+docker compose down -v                                 # deja el sistema limpio
+```
+
+Servicios disponibles: gateway en `https://localhost:8443` (certificado autofirmado), Grafana en `http://localhost:3000` y Prometheus en `http://localhost:9090` (el puerto se cambia con `PROMETHEUS_PORT`).
