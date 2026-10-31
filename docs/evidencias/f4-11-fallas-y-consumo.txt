@@ -26,3 +26,15 @@ andina-market-usuarios-1     0.50%     68.63MiB / 23.25GiB
 andina-market-grafana-1      0.04%     72.01MiB / 23.25GiB
 andina-market-db-1           0.00%     55.77MiB / 23.25GiB
 andina-market-prometheus-1   0.13%     28.96MiB / 23.25GiB
+
+## 3. Caída de una réplica de pedidos (3 réplicas, tráfico de 4 req/s) — 2026-10-31T15:55:18-05:00
+andina-market-pedidos-1 Up 11 minutes (healthy)
+andina-market-pedidos-2 Up 10 seconds (healthy)
+andina-market-pedidos-3 Up 11 seconds (healthy)
+$ docker kill andina-market-pedidos-2   (en t = 0 s)
+(60 solicitudes GET /api/pedidos cada 0,25 s desde t = 0; códigos individuales omitidos, todos 200)
+Resumen: 200=60 
+Estado posterior:
+andina-market-pedidos-1 Up 12 minutes (healthy)
+andina-market-pedidos-2 Exited (137) 37 seconds ago
+andina-market-pedidos-3 Up 48 seconds (healthy)

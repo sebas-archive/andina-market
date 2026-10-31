@@ -19,4 +19,16 @@ Formato: tarea · qué falló · salida del error · alternativa más barata.
 
 - **Qué falló:** el mismo bloqueo de la Tarea 3.1: el agente no puede ejecutar `npx @mermaid-js/mermaid-cli`.
 - **Alternativa más barata:** ejecutar el comando de la cabecera de `docs/diagrama-demo.mmd` (con el mismo Chrome usado para la Figura 1) para generar `docs/evidencias/f4-01-demo.png`.
-- **Pendiente:** `docs/evidencias/f4-01-demo.png` no existe todavía; el informe ya lo referencia.
+- **Resuelto (31/10/2026):** el equipo generó `docs/evidencias/f4-01-demo.png` (1584 × 557 px, commit `709afa0`); el agente verificó que se lee.
+
+## Tarea 5.3 · Captura de la calculadora de AWS (`f5-01-calculadora.png`)
+
+- **Qué falló:** la Calculadora de precios de AWS es una aplicación web interactiva; el agente no puede armar la estimación ni capturarla con fecha visible de forma confiable.
+- **Alternativa aplicada:** los precios salen de la AWS Price List API oficial (URL y fecha de publicación de cada archivo en `docs/costos.md`, fuentes F1–F13), consultada el 31/10/2026.
+- **Pendiente para el equipo:** cargar en https://calculator.aws los recursos de la Tabla C1 y guardar la captura con fecha en `docs/evidencias/f5-01-calculadora.png`; si el total difiere de 425,86 USD, avisar para revisar los supuestos.
+
+## Tarea 5.3 · Costo actual de la infraestructura propia
+
+- **Qué falló:** el caso de la guía y los datos canónicos del plan no declaran el costo actual de los servidores propios ni de su mantenimiento.
+- **Salida:** `docs/costos.md` y §8 dejan la comparación marcada con `[verificar]`.
+- **Pendiente para el equipo:** aportar la cifra (o un supuesto aprobado y documentado) para completar la línea de comparación.

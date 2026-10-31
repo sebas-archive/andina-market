@@ -1,0 +1,29 @@
+# Evidencia de cifrado en tránsito — 2026-10-31T15:56:10-05:00
+$ echo | openssl s_client -connect localhost:8443 -servername localhost
+subject=CN=localhost, O=AndinaMarket demo
+issuer=CN=localhost, O=AndinaMarket demo
+New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
+Protocol: TLSv1.3
+Server public key is 2048 bit
+Verify return code: 18 (self-signed certificate)
+
+$ openssl s_client -connect localhost:8443 -tls1_2   (TLS 1.2 aceptado)
+New, TLSv1.2, Cipher is ECDHE-RSA-AES256-GCM-SHA384
+
+$ grep ssl_protocols nginx/nginx.conf   (TLS 1.0/1.1 no habilitados en el servidor)
+        ssl_protocols       TLSv1.2 TLSv1.3;
+
+$ curl -sI http://localhost:8080/health
+HTTP/1.1 301 Moved Permanently
+Location: https://localhost:8443/health
+
+$ curl -skI https://localhost:8443/api/productos/00000000-0000-4000-8000-000000000000
+HTTP/1.1 405 Method Not Allowed
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+
+$ psql: formato del hash de contraseñas en usuarios.usuario
+$2b$12$|60|14
+$2a$12$|60|3

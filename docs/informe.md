@@ -241,7 +241,7 @@ La Tabla 11 cubre los seis aspectos de la Etapa 5 de la guía. La Tabla 12 compa
 | Acceso y autenticación | Registro, login, token, bloqueo, roles | `pytest` de usuarios y productos | 8/8 y 8/8 pruebas; 423 al sexto intento; 403 a `cliente` en `POST /api/productos` | RF-01, RF-02 | Cumple |
 | Disponibilidad | Flujo completo y caída de pedidos e inventario | `humo.sh`; `docker compose stop` | Humo en 1 s; sin pedidos, el catálogo responde 200 en 23 ms; sin inventario, `stock: null` en 509 ms; recuperación en 12,4 s y 11,5 s | RNF-01 (degradación) | Cumple en la demo; el 99,9 % mensual no es medible localmente |
 | Aumento de solicitudes | Rampa 20 → 100 → 200 req/s | `escalar.sh` (k6) | 63 req/s procesadas; 42,6–45,2 % de errores; p95 = 5 s | RNF-03, RNF-04 | No cumple |
-| Protección de la información | TLS, cabeceras, rate limit, rutas internas, contraseñas | `curl`, `openssl s_client`, consulta SQL | TLS 1.3; 4 cabeceras; 29 de 50 solicitudes en ráfaga con 429; 403 en `/reservar`; hash `$2a$12$` | RNF-02 | Cumple parcialmente (sin cifrado en reposo local) |
+| Protección de la información | TLS, cabeceras, rate limit, rutas internas, contraseñas | `curl`, `openssl s_client`, consulta SQL | TLS 1.3; 4 cabeceras; 29 de 50 solicitudes en ráfaga con 429; 403 en `/reservar`; hash bcrypt `$2a$12$`/`$2b$12$` | RNF-02 | Cumple parcialmente (sin cifrado en reposo local) |
 | Recuperación ante fallos | Pedido borrado y restaurado | `respaldo.sh --probar` | Mismo ID recuperado; restauración en 554 ms; respaldo de 340 KB | RNF-01 (RTO/RPO) | Cumple |
 | Consumo y costos | CPU y RAM por contenedor | `docker stats` | Bajo carga: inventario 85–89 % y productos 67–68 % de un núcleo; pedidos ≤ 6 %. En reposo, ≤ 77 MiB | Dimensionamiento de §8 | Insumo para §8 |
 
@@ -316,6 +316,34 @@ La Tabla 14 resume quién puede invocar cada recurso de la API y dónde se aplic
 
 En el gateway se limita cada IP a 10 req/s con ráfaga de 20 y se responde 429 al exceder; el umbral de la demo protege contra abuso desde una sola IP, y en producción se ajustaría al tráfico real por usuario en AWS WAF. El tráfico externo solo se acepta por HTTPS (TLS 1.2 y 1.3; el puerto HTTP redirige con 301) y cada respuesta incluye las cabeceras `Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options: DENY` y `Referrer-Policy`.
 
+La Tabla 15 relaciona las amenazas principales del caso con el control que las mitiga y su categoría en el OWASP Top 10:2021 (OWASP Foundation, 2021).
+
+**Tabla 15.** Amenazas y controles.
+
+| Amenaza | Control en la demo | Control en producción | OWASP 2021 |
+|---|---|---|---|
+| Credenciales débiles | Contraseña de 8 caracteres como mínimo, hash bcrypt de costo 12 | Igual; MFA para operadores de AWS | A07 Identification and Authentication Failures |
+| Fuerza bruta sobre el login | Bloqueo tras 5 fallos en 15 min (423) y 10 req/s por IP (429) | Regla de límite por IP en AWS WAF | A07 Identification and Authentication Failures |
+| Inyección SQL | Consultas parametrizadas de SQLAlchemy; validación de entrada con Pydantic (422) | Igual + reglas administradas de inyección SQL en WAF | A03 Injection |
+| Exposición de datos en tránsito | Solo HTTPS (TLS 1.2/1.3), redirección 301 y HSTS | Certificado de ACM en CloudFront y ALB; TLS hacia RDS | A02 Cryptographic Failures |
+| Acceso indebido a inventario | Rutas internas bloqueadas en el gateway (403) y `X-Service-Token` (401); rol por esquema en PostgreSQL | Además, grupos de seguridad que solo permiten tráfico entre servicios | A01 Broken Access Control |
+| Filtración de secretos en el repositorio | `.env` fuera de Git; `.env.example` sin valores reales | Secretos en Secrets Manager, inyectados en la tarea por IAM | A05 Security Misconfiguration |
+
+**Responsabilidad compartida aplicada.**
+
+- **IAM:** AWS opera el servicio de identidades. AndinaMarket define un rol por tarea con acceso solo a sus secretos y a su cola, y exige MFA a los operadores.
+- **RDS:** AWS parcha el motor y opera respaldos y réplica. AndinaMarket configura el grupo de seguridad, TLS, cifrado en reposo y un usuario por esquema (AWS, s.f.-d).
+- **S3:** AWS cifra por defecto todo objeto nuevo con SSE-S3 (AWS, s.f.-m). AndinaMarket bloquea el acceso público y solo entrega imágenes por CloudFront o con URL prefirmadas.
+- **Aplicación:** responsabilidad completa de AndinaMarket: código, dependencias, validación de entrada, JWT y autorización por rol.
+
+### 7.2 Cifrado y gestión de secretos
+
+**En tránsito.** El gateway de la demo negocia TLS 1.3 (`TLS_AES_256_GCM_SHA384`), acepta TLS 1.2 y no habilita versiones anteriores. El puerto HTTP redirige con 301 y cada respuesta lleva HSTS (`f5-02-cifrado-transito.txt`). El certificado es autofirmado; en producción, ACM emite el certificado de CloudFront y del ALB.
+
+**En reposo.** RDS cifra con AES-256 la instancia y sus snapshots (AWS, s.f.-d), y S3 aplica SSE-S3 sin costo adicional desde el 5 de enero de 2023 (AWS, s.f.-m). La demo no cifra el volumen local de PostgreSQL, que es una de las brechas de la Tabla 11. Las contraseñas nunca se guardan en claro: se almacena su hash bcrypt de costo 12.
+
+**Secretos.** En la demo, `JWT_SECRET`, `SERVICE_TOKEN` y las contraseñas viven en `.env`, que Git ignora; el repositorio solo contiene `.env.example` con `cambiar_esto`. En producción cada secreto se guarda en Secrets Manager: las credenciales de RDS (una por servicio), el secreto JWT y el token entre servicios. ECS los inyecta en la tarea al arrancar mediante el rol IAM, de modo que no aparecen en la imagen, en la definición de tarea ni en el repositorio.
+
 ### 7.3 Respaldo y recuperación
 
 En la demo, `scripts/respaldo.sh` genera un `pg_dump` comprimido con marca de tiempo en `respaldos/` y lo copia al bucket `respaldos` del almacén de objetos. La prueba `--probar` crea un pedido, respalda, borra el pedido, restaura en una base temporal y verifica que reaparece: el pedido `05b57d5a-…` se recuperó con el mismo ID y la restauración tardó 554 ms (`f4-09-restauracion.txt`).
@@ -325,3 +353,79 @@ En producción se proponen tres medidas:
 - **Frecuencia:** respaldos automáticos de RDS con PITR. RDS sube los registros de transacciones a S3 cada 5 min (AWS, s.f.-g), lo que deja la pérdida máxima por debajo del RPO de 15 min de RNF-01. Además, un `pg_dump` diario se guarda en S3 como copia lógica independiente.
 - **Retención:** 30 días para los respaldos automáticos y las copias lógicas.
 - **Verificación:** cada mes se restaura en una instancia nueva, sin tocar la original (AWS, s.f.-g), y se mide el tiempo total. Ese tiempo incluye restaurar, actualizar el endpoint en Secrets Manager y reiniciar las tareas de ECS, y debe quedar por debajo del RTO de 4 h. La restauración local de 554 ms solo valida el procedimiento; el tiempo real depende del tamaño de la base y de la instancia.
+
+### 7.4 Disponibilidad y comportamiento ante fallos
+
+La Tabla 16 resume cinco escenarios de falla. Tres se reprodujeron en la demo deteniendo contenedores, uno con la prueba de carga y uno con las pruebas automatizadas.
+
+**Tabla 16.** Escenarios de falla.
+
+| Falla simulada | Cómo se reprodujo en la demo | Efecto observado | Mecanismo que lo mitiga | Recuperación esperada |
+|---|---|---|---|---|
+| Caída del servicio de pedidos | `docker compose stop pedidos` | Catálogo 200 en 23 ms; `POST /api/pedidos` 502 en 3,9 s; volvió a healthy en 12,4 s | Servicios independientes; ECS reemplaza tareas (AWS, s.f.-i) | Lo que tarde ECS en lanzar una tarea nueva; en la demo, 12,4 s |
+| Caída de una réplica de pedidos | `docker kill` de 1 de 3 réplicas con tráfico de 4 req/s | 60 de 60 solicitudes con 200; la réplica no se reinició sola | Reparto entre réplicas; en ECS, el `desiredCount` repone la tarea | Sin interrupción visible |
+| Caída de inventario | `docker compose stop inventario` | Catálogo 200 con `stock: null` en 509 ms; healthy de nuevo en 11,5 s | Timeout de 500 ms y valor de respaldo en productos | Igual a la caída de pedidos |
+| Saturación de carga | k6 hasta 200 req/s | 63 req/s procesadas; 42,6 % de errores (504) | Autoescalado del servicio que satura (§6.3) | Depende de que escale productos e inventario |
+| Fallo de pago | `pytest` con `PAGO_FALLA_PCT=100` | 402 y stock repuesto | Compensación: liberación de la reserva | Inmediata |
+
+Fuente: `f4-11-fallas-y-consumo.txt`, `f4-08-carga-3-replicas.txt` y pruebas de pedidos.
+
+**Autoescalado propuesto.** Cada servicio usa ECS Service Auto Scaling, no el HPA de Kubernetes, con dos políticas de seguimiento de objetivo: CPU media del 60 % y `ALBRequestCountPerTarget` (AWS, s.f.-k). El rango es de 2 a 10 tareas y el cálculo de capacidad está en §6.3. El mínimo de 1 réplica que usa la demo no cumple RNF-01: con una sola tarea, su caída deja el servicio sin respuesta durante unos 12 s, como se midió en la caída de pedidos. Además, una tarea vive en una sola zona, así que una falla de zona la elimina. Con 2 tareas en zonas distintas, el ALB sigue enviando tráfico a la sobreviviente mientras ECS repone la otra.
+
+**Despliegue sin caída.** Se usa el despliegue rolling de ECS con `minimumHealthyPercent` = 100 y `maximumPercent` = 200. Con 2 tareas deseadas, ECS arranca las nuevas antes de detener las viejas, y solo pasa tráfico a una tarea cuando supera el health check `/health` del ALB. Al retirar una tarea, el ALB deja de enviarle solicitudes y espera a que terminen las que están en curso; por defecto espera hasta 300 s (AWS, s.f.-o), un valor que conviene bajar a unos 30 s porque las solicitudes de la API duran menos de 5 s. Si las tareas nuevas no arrancan, el circuit breaker de despliegue revierte a la revisión anterior (AWS, s.f.-n).
+
+Este esquema tiene límites. No protege contra un cambio de esquema de base de datos incompatible con la versión anterior, porque ambas versiones conviven durante el despliegue y comparten la base. Tampoco detecta errores de lógica que pasan el health check; para eso se requieren alarmas de aplicación sobre la tasa de 5xx.
+
+### 7.5 Monitoreo propuesto en producción
+
+La Tabla 17 define las alarmas de CloudWatch. La primera traslada a producción la regla `LatenciaP95Alta` que la demo ya evalúa en Prometheus (`observabilidad/alertas.yml`): p95 por servicio mayor que 800 ms durante 2 min.
+
+**Tabla 17.** Alarmas de monitoreo.
+
+| Métrica | Umbral | Acción | Severidad |
+|---|---|---|---|
+| p95 de `TargetResponseTime` del ALB por target group | > 800 ms durante 2 min | Notificar; revisar el escalado del servicio | Alta |
+| Tasa de 5xx de los targets (`HTTPCode_Target_5XX_Count` / `RequestCount`) | > 1 % durante 5 min | Notificar; evaluar reversión del último despliegue | Crítica |
+| CPU media del servicio ECS | > 80 % durante 10 min con el máximo de tareas alcanzado | Notificar; subir el máximo o el tamaño de tarea | Alta |
+| Conexiones de RDS (`DatabaseConnections`) | > 80 % del máximo de la instancia | Notificar; revisar los pools de conexiones | Alta |
+| Almacenamiento libre de RDS (`FreeStorageSpace`) | < 20 % del asignado | Notificar; ampliar el almacenamiento | Media |
+| Errores de login (filtro de métricas sobre los logs de usuarios: respuestas 401 y 423) | > 50 por minuto | Notificar a seguridad; revisar las reglas de WAF | Alta |
+
+**Qué se registra.** Logs JSON con `timestamp` UTC, `servicio`, `nivel`, `correlation_id`, `metodo`, `ruta`, `codigo`, `duracion_ms`, `usuario_id` cuando hay sesión, e IP de origen. La retención es de 30 días en CloudWatch Logs, coherente con §8. **Nunca se registran** tokens JWT, contraseñas ni sus hashes, el `X-Service-Token`, cuerpos de solicitudes de pago ni datos de tarjeta, que además no pasan por la plataforma.
+
+**Trazabilidad entre servicios.** Una compra atraviesa el gateway, pedidos, productos e inventario (§5.2). Si cada servicio registra por separado, un error 503 en pedidos no se puede asociar con el timeout de inventario que lo causó. El gateway debe generar un `correlation_id` por solicitud, enviarlo como cabecera `X-Correlation-ID`, y cada servicio debe reenviarlo en sus llamadas internas e incluirlo en cada línea de log. Así, una consulta en CloudWatch Logs Insights por ese identificador reconstruye el recorrido completo. La demo aún no lo implementa: el diagnóstico de la prueba de carga de §6.4 tuvo que cruzar los logs de Nginx con los de cada servicio por marca de tiempo.
+
+## 8. Análisis de costos
+
+El cálculo detallado, con cantidades, precio unitario y fuente por línea, está en `docs/costos.md` (Tablas C1 a C3). Los precios se consultaron el 31/10/2026 en la AWS Price List API, el catálogo oficial de precios bajo demanda de AWS, para `us-east-1` (AWS, 2026).
+
+**Supuestos principales:**
+
+- 730 h/mes.
+- 26,28 M solicitudes de API al mes (10 req/s de media) y 4,5 M a CloudFront.
+- 20 GB en RDS y 4 GB de imágenes.
+- 150 GB de salida: 120 GB por CloudFront en Sudamérica y 30 GB por el ALB.
+- 4 servicios × 2 tareas de 0,5 vCPU y 1 GB.
+- Logs de 1 KB por solicitud, con retención de 30 días.
+
+La Tabla 18 agrupa el resultado por componente.
+
+**Tabla 18.** Costo mensual estimado (USD).
+
+| Componente | Base (~40 req/s) | Incremento en temporada (300 req/s, 2 h/día) |
+|---|---|---|
+| Cómputo (Fargate, ECR) | 144,26 | 23,70 |
+| Base de datos (RDS Multi-AZ, gp3) | 98,77 | 0,00 |
+| Red (ALB, IPv4, VPC endpoints, transferencia) | 105,37 | 7,21 |
+| Borde (CloudFront y WAF) | 57,57 | 88,84 |
+| Observabilidad y servicios de soporte (CloudWatch, Secrets Manager, SQS, S3) | 19,89 | 29,76 |
+| **Total** | **425,86** | **149,51** |
+
+El escenario base cuesta 425,86 USD/mes y un mes de temporada 575,37 USD. En temporada pesa más el costo por solicitud (CloudFront, WAF y logs) que el cómputo. Cuatro medidas cuantificadas ahorran 84,38 USD/mes (Tabla C3):
+
+- Redimensionar usuarios y pedidos a 0,25 vCPU / 0,5 GB, sustentado en el 6 % de CPU medido.
+- Un Compute Savings Plan de 1 año, con 20 % de descuento sobre Fargate.
+- Una instancia reservada de RDS por 1 año.
+- Un ciclo de vida en S3 que mueve los respaldos antiguos a Glacier Instant Retrieval.
+
+Con ellas el base queda en 341,48 USD/mes, aún 91,48 USD (37 %) por encima del presupuesto de 250 USD. Las dos partidas que más separan la estimación del presupuesto son los VPC endpoints (73,00 USD) y WAF (34,47 USD). Ambas son decisiones de seguridad que el equipo debe confirmar o recortar. La comparación con el costo actual de los servidores propios no se puede hacer: el caso no declara esa cifra.
