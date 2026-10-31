@@ -10,6 +10,7 @@ RUN useradd --create-home --uid 10001 app && mkdir -p /data/objetos && chown app
 WORKDIR /srv
 COPY pytest.ini .
 COPY app ./app
+COPY imagenes_seed ./imagenes_seed
 COPY tests ./tests
 USER app
 EXPOSE 8000

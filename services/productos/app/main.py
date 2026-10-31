@@ -37,6 +37,8 @@ Sesion = sessionmaker(engine, expire_on_commit=False)
 # volumen local con la misma organización bucket/clave y se sirven con URL firmadas por HMAC, como S3.
 ALMACEN = os.path.join(os.environ.get("ALMACEN_DIR", "/data/objetos"), BUCKET)
 CLAVE_FIRMA = hashlib.sha256(b"imagenes:" + JWT_SECRET.encode()).digest()
+# Fotos de muestra del catálogo (licencias libres, ver imagenes_seed/CREDITOS.md).
+IMAGENES_SEED = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "imagenes_seed")
 
 
 class Base(DeclarativeBase):
@@ -86,13 +88,19 @@ def guardar_objeto(clave: str, contenido: bytes):
 
 
 def preparar_almacenamiento():
+    """Sube al almacén las imágenes del seed: la foto de imagenes_seed/ si existe; si no, un marcador PNG."""
     os.makedirs(ALMACEN, exist_ok=True)
     with Sesion() as sesion:
         claves = sesion.scalars(select(Producto.imagen_key).where(Producto.imagen_key.like("seed/%"))).all()
-    imagen = png_marcador()
     for clave in claves:
-        if not os.path.exists(ruta_objeto(clave)):
-            guardar_objeto(clave, imagen)
+        if os.path.exists(ruta_objeto(clave)):
+            continue
+        foto = os.path.join(IMAGENES_SEED, os.path.basename(clave))
+        if os.path.exists(foto):
+            with open(foto, "rb") as f:
+                guardar_objeto(clave, f.read())
+        else:
+            guardar_objeto(clave, png_marcador())
 
 
 @asynccontextmanager

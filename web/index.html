@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AndinaMarket</title>
+  <!-- Diseño del catálogo inspirado en «E-commerce 4» de Hirael (MIT, Mohammad Shehadeh); reimplementado sin React. -->
+  <link rel="stylesheet" href="/estilos.css">
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-interior">
+      <a class="marca" href="#catalogo" aria-label="AndinaMarket, inicio">
+        <span class="marca-icono" aria-hidden="true"></span>
+        <span>Andina<strong>Market</strong></span>
+      </a>
+      <form class="buscador" id="form-busqueda" role="search">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="busqueda" type="search" placeholder="Buscar por nombre o SKU" aria-label="Buscar productos">
+      </form>
+      <nav class="acciones">
+        <a class="boton boton-fantasma" href="#pedidos" id="enlace-pedidos" hidden>Mis pedidos</a>
+        <button class="boton boton-fantasma" id="boton-sesion">Iniciar sesión</button>
+        <button class="boton boton-contorno" id="boton-carrito" aria-label="Abrir carrito">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H2"/><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/></svg>
+          <span class="contador" id="contador-carrito">0</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section id="vista-catalogo" class="contenedor">
+      <div class="cabecera-catalogo">
+        <span class="sobretitulo entrar">Tienda</span>
+        <h1 class="entrar" style="animation-delay:80ms">Catálogo AndinaMarket</h1>
+        <p class="entrar" style="animation-delay:160ms">Tecnología, hogar, moda y deportes. El stock de cada producto se consulta en tiempo real al servicio de inventario.</p>
+      </div>
+
+      <div class="disposicion">
+        <aside class="filtros entrar" id="filtros" aria-label="Filtros" style="animation-delay:240ms">
+          <div class="filtros-cabecera">
+            <div>
+              <span class="filtros-titulo">Filtros</span>
+              <span class="solo-movil sutil">Los resultados se actualizan al cambiarlos.</span>
+            </div>
+            <button class="boton boton-fantasma boton-xs" id="limpiar-filtros" disabled>Limpiar todo</button>
+            <button class="cerrar solo-movil" id="cerrar-filtros" aria-label="Cerrar filtros">×</button>
+          </div>
+          <div class="filtros-cuerpo">
+            <fieldset class="grupo">
+              <legend>Categoría</legend>
+              <div id="lista-categorias"></div>
+            </fieldset>
+            <fieldset class="grupo">
+              <legend>Precio</legend>
+              <div class="rango" id="rango">
+                <div class="rango-pista"><div class="rango-relleno" id="rango-relleno"></div></div>
+                <input type="range" id="precio-min" aria-label="Precio mínimo">
+                <input type="range" id="precio-max" aria-label="Precio máximo">
+              </div>
+              <div class="rango-valores"><span id="valor-min"></span><span id="valor-max"></span></div>
+            </fieldset>
+            <div class="grupo grupo-fila">
+              <label for="solo-stock">Solo con stock</label>
+              <button class="interruptor" id="solo-stock" role="switch" aria-checked="false"><span></span></button>
+            </div>
+          </div>
+          <div class="filtros-pie solo-movil">
+            <button class="boton boton-contorno" id="limpiar-filtros-movil">Limpiar todo</button>
+            <button class="boton boton-primario" id="ver-resultados">Ver resultados</button>
+          </div>
+        </aside>
+        <div class="velo-filtros" id="velo-filtros" hidden></div>
+
+        <div class="resultados entrar" style="animation-delay:320ms">
+          <div class="barra-resultados">
+            <div class="fila-resultados">
+              <div class="izquierda">
+                <button class="boton boton-contorno boton-sm solo-movil" id="abrir-filtros">
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+                  Filtros <span id="cuenta-activos"></span>
+                </button>
+                <p class="sutil" id="conteo" aria-live="polite">Cargando…</p>
+              </div>
+              <label class="orden">
+                <span class="sr-only">Ordenar productos</span>
+                <select id="orden">
+                  <option value="destacados">Destacados</option>
+                  <option value="precio-asc">Precio: menor a mayor</option>
+                  <option value="precio-desc">Precio: mayor a menor</option>
+                  <option value="nombre">Nombre: A–Z</option>
+                </select>
+              </label>
+            </div>
+            <ul class="activos" id="activos" aria-label="Filtros activos" hidden></ul>
+          </div>
+          <div class="rejilla" id="rejilla"></div>
+          <div class="vacio-estado" id="vacio" hidden>
+            <h2>Ningún producto coincide con esos filtros</h2>
+            <p class="sutil">Prueba un rango de precio más amplio o menos categorías.</p>
+            <button class="boton boton-contorno" id="limpiar-vacio">Limpiar filtros</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="vista-pedidos" class="contenedor" hidden>
+      <div class="cabecera-catalogo">
+        <span class="sobretitulo">Cuenta</span>
+        <h1>Mis pedidos</h1>
+        <p class="sutil" id="resumen-pedidos"></p>
+      </div>
+      <div class="lista-pedidos" id="lista-pedidos"></div>
+      <a class="boton boton-contorno" href="#catalogo">Volver al catálogo</a>
+    </section>
+  </main>
+
+  <aside class="hoja" id="panel-carrito" aria-label="Carrito" hidden>
+    <div class="hoja-cabecera">
+      <div>
+        <h2>Tu carrito</h2>
+        <p class="sutil">El total final lo calcula el servidor con los precios del catálogo.</p>
+      </div>
+      <button class="cerrar" data-cerrar="panel-carrito" aria-label="Cerrar carrito">×</button>
+    </div>
+    <div class="hoja-cuerpo" id="items-carrito"></div>
+    <div class="hoja-pie">
+      <div class="total"><span>Total estimado</span><strong id="total-carrito">$ 0</strong></div>
+      <button class="boton boton-primario boton-ancho" id="boton-pedido" disabled>Crear pedido</button>
+    </div>
+  </aside>
+  <div class="velo" id="velo" hidden></div>
+
+  <dialog id="dialogo-sesion">
+    <form method="dialog" class="dialogo-cabecera">
+      <div class="pestanas" role="tablist">
+        <button type="button" class="pestana activa" data-modo="login" role="tab">Iniciar sesión</button>
+        <button type="button" class="pestana" data-modo="registro" role="tab">Crear cuenta</button>
+      </div>
+      <button class="cerrar" aria-label="Cerrar">×</button>
+    </form>
+    <form id="form-sesion" class="formulario">
+      <label id="campo-nombre" hidden>Nombre
+        <input name="nombre" autocomplete="name">
+      </label>
+      <label>Email
+        <input name="email" type="email" required autocomplete="email">
+      </label>
+      <label>Contraseña
+        <input name="password" type="password" required minlength="8" autocomplete="current-password">
+      </label>
+      <p class="error" id="error-sesion" role="alert"></p>
+      <button class="boton boton-primario boton-ancho" type="submit" id="boton-enviar-sesion">Entrar</button>
+    </form>
+  </dialog>
+
+  <dialog id="dialogo-pedido">
+    <div class="formulario">
+      <h2 id="titulo-pedido">Pedido creado</h2>
+      <div id="detalle-pedido"></div>
+      <p class="error" id="error-pedido" role="alert"></p>
+      <div class="fila-botones">
+        <button class="boton boton-contorno" id="boton-cerrar-pedido">Cerrar</button>
+        <button class="boton boton-primario" id="boton-pagar">Pagar ahora</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="aviso" id="aviso" role="status" hidden></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

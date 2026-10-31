@@ -33,6 +33,7 @@ INSERT INTO catalogo.producto (sku, nombre, categoria, precio) VALUES
 INSERT INTO inventario.stock (producto_id, disponible)
 SELECT id, CASE WHEN sku = 'DEP-005' THEN 12 ELSE 100 END FROM catalogo.producto;
 
--- Imagen de muestra para un producto por categoría; Productos sube el archivo a MinIO al arrancar.
-UPDATE catalogo.producto SET imagen_key = 'seed/' || sku || '.png'
-WHERE sku IN ('TEC-001', 'HOG-001', 'MOD-001', 'DEP-001');
+-- Fotos de muestra (services/productos/imagenes_seed/, licencias libres); Productos las sube al almacén
+-- de objetos al arrancar. DEP-005 queda sin foto para probar la interfaz sin imagen.
+UPDATE catalogo.producto SET imagen_key = 'seed/' || sku || '.jpg'
+WHERE sku <> 'DEP-005';

@@ -44,6 +44,10 @@ CHROME=/ruta/a/chrome bash scripts/exportar.sh
 | PostgreSQL | sin puerto publicado |
 | Grafana (dashboard aprovisionado, acceso anónimo de lectura) | 3000 |
 
+## Interfaz web
+
+Con el sistema arriba, abrir `https://localhost:8443/` (certificado autofirmado: aceptar la advertencia del navegador). Permite navegar el catálogo, iniciar sesión con un usuario de prueba, armar el carrito, crear y pagar pedidos y ver «Mis pedidos». Fuente: `web/`. Está fuera del alcance del plan (`docs/PROPUESTAS.md`, punto 21).
+
 ## Guion de demo
 
 Flujo completo a través del gateway (`https://localhost:8443`, certificado autofirmado: por eso `-k`): registro → login → catálogo → pedido → pago → consulta. Requiere `python3` para leer el JSON.
@@ -58,3 +62,5 @@ curl -sk https://localhost:8443/api/pedidos/$PEDIDO -H "Authorization: Bearer $T
 ```
 
 El pago es simulado y falla en el 10 % de los intentos (`PAGO_FALLA_PCT`); si devuelve 402, el stock reservado se libera. Usuarios de prueba creados por `db/seed.sql`: `admin@example.com` (admin), `cliente1@example.com` y `cliente2@example.com`, con la contraseña de `SEED_USUARIOS_PASSWORD`.
+
+Las fotos del catálogo de muestra son de Wikimedia Commons con licencias libres; autor, licencia y enlace de cada una están en [`services/productos/imagenes_seed/CREDITOS.md`](services/productos/imagenes_seed/CREDITOS.md).
