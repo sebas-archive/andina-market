@@ -15,6 +15,7 @@ from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, create_en
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship, sessionmaker
+from prometheus_fastapi_instrumentator import Instrumentator
 
 JWT_SECRET = os.environ["JWT_SECRET"]
 SERVICE_TOKEN = os.environ["SERVICE_TOKEN"]
@@ -82,6 +83,9 @@ class ErrorApi(HTTPException):
 
 
 app = FastAPI(title="Servicio Pedidos")
+Instrumentator(should_instrument_requests_inprogress=True, inprogress_labels=True).instrument(app).expose(
+    app, include_in_schema=False
+)
 bearer = HTTPBearer(auto_error=False)
 
 

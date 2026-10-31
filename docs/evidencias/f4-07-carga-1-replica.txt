@@ -1,0 +1,53 @@
+# Medición con pedidos=1 — 2026-10-31T15:35:44-05:00
+# Host: 20 CPU, 23 GB RAM
+$ docker compose --profile carga run --rm k6 run /pruebas/pedidos.js
+# advertencias 'Request Failed' de k6: 0
+time="2026-10-31T20:38:14Z" level=warning msg="Insufficient VUs, reached 600 active VUs and cannot initialize more" executor=ramping-arrival-rate scenario=escalonado
+
+     ✗ listar 200
+      ↳  52% — ✓ 4355 / ✗ 3931
+     ✗ detalle 200
+      ↳  53% — ✓ 1283 / ✗ 1095
+     ✗ pedido 201
+      ↳  72% — ✓ 853 / ✗ 320
+
+     █ setup
+
+       ✓ login 200
+
+     checks.........................: 54.84% 6492 out of 11838
+     data_received..................: 11 MB  56 kB/s
+     data_sent......................: 2.2 MB 12 kB/s
+     dropped_iterations.............: 1962   10.473774/s
+     http_req_blocked...............: avg=130.37µs p(50)=5.55µs   p(95)=1.2ms    p(99)=3.14ms   max=14.89ms
+     http_req_connecting............: avg=10.37µs  p(50)=0s       p(95)=68.65µs  p(99)=190.12µs max=11.41ms
+   ✗ http_req_duration..............: avg=2.48s    p(50)=2s       p(95)=5s       p(99)=6.66s    max=9.13s  
+       { expected_response:true }...: avg=484.17ms p(50)=33.84ms  p(95)=3.17s    p(99)=4.53s    max=4.98s  
+     ✗ { name:crear_pedido }........: avg=712.72ms p(50)=348.98ms p(95)=2s       p(99)=3.02s    max=3.06s  
+     ✗ { name:detalle_producto }....: avg=2.58s    p(50)=2.42s    p(95)=5s       p(99)=7.04s    max=9.13s  
+     ✗ { name:listar_productos }....: avg=2.71s    p(50)=3.54s    p(95)=5s       p(99)=7.04s    max=9.13s  
+   ✗ http_req_failed................: 45.15% 5346 out of 11839
+     http_req_receiving.............: avg=64.14µs  p(50)=58.74µs  p(95)=104.05µs p(99)=143.08µs max=1.05ms 
+     http_req_sending...............: avg=21.16µs  p(50)=18.15µs  p(95)=35.28µs  p(99)=59.85µs  max=865.6µs
+     http_req_tls_handshaking.......: avg=111.03µs p(50)=0s       p(95)=1.08ms   p(99)=2.89ms   max=6.16ms 
+     http_req_waiting...............: avg=2.48s    p(50)=2s       p(95)=5s       p(99)=6.66s    max=9.13s  
+     http_reqs......................: 11839  63.200311/s
+     iteration_duration.............: avg=2.48s    p(50)=2s       p(95)=5s       p(99)=6.68s    max=9.13s  
+     iterations.....................: 11837  63.189634/s
+     vus............................: 11     min=0             max=600
+     vus_max........................: 600    min=100           max=600
+
+time="2026-10-31T20:38:52Z" level=error msg="thresholds on metrics 'http_req_duration, http_req_duration{name:crear_pedido}, http_req_duration{name:detalle_producto}, http_req_duration{name:listar_productos}, http_req_failed' have been crossed"
+
+# código de salida de k6: 99
+
+# CPU media por contenedor durante la prueba (docker stats, 100 % = 1 núcleo)
+andina-market-inventario-1         84.7 % (93 muestras)
+andina-market-pedidos-1             5.7 % (93 muestras)
+andina-market-productos-1          67.2 % (93 muestras)
+
+# Códigos HTTP por endpoint en el gateway durante la medición (access log de Nginx)
+   5552 GET /api/productos 200
+   5026 GET /api/productos 504
+    846 POST /api/pedidos 201
+    320 POST /api/pedidos 503

@@ -1,0 +1,20 @@
+$ bash scripts/respaldo.sh --probar
+== 1. Crear un pedido de prueba
+pedido creado: 05b57d5a-32ee-4073-9486-adc1cf3a0fa3
+05b57d5a-32ee-4073-9486-adc1cf3a0fa3|creado|89900.00
+== 2. Respaldar
+respaldo: respaldos/andina-20261031T204303Z.dump (340K)
+copia en almacén de objetos: respaldos/andina-20261031T204303Z.dump
+-rw-r--r-- 1 1000 1000 345527 Oct 31 20:43 andina-20261031T204303Z.dump
+== 3. Borrar el pedido (simula pérdida de datos)
+DELETE 1
+filas con ese ID en andina: 0
+== 4. Restaurar en la base temporal andina_restaurada
+NOTICE:  database "andina_restaurada" does not exist, skipping
+DROP DATABASE
+CREATE DATABASE
+tiempo de restauración: 554 ms
+== 5. Verificar que el pedido reaparece con el mismo ID
+en andina_restaurada: 05b57d5a-32ee-4073-9486-adc1cf3a0fa3 creado 89900.00
+OK: pedido 05b57d5a-32ee-4073-9486-adc1cf3a0fa3 recuperado desde respaldos/andina-20261031T204303Z.dump
+código de salida: 0

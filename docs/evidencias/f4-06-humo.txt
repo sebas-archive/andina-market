@@ -1,0 +1,37 @@
+$ docker compose down -v && docker compose up -d --wait && bash scripts/humo.sh
+
+[15:30:46] 1. Esperando healthchecks de los contenedores
+db: healthy
+grafana: 
+inventario: healthy
+nginx: healthy
+pedidos: healthy
+productos: healthy
+prometheus: 
+usuarios: healthy
+
+[15:30:46] 2. Registro de humo-1793478646-6566@example.com
+  HTTP 201 {"id":"abc2d252-199b-4982-84cc-01aee3e69026","email":"humo-1793478646-6566@example.com","rol":"cliente"}
+
+[15:30:47] 3. Login
+  HTTP 200 {"access_token":"<token>","to
+
+[15:30:47] 4. Listado de productos
+  HTTP 200 {"total":20,"items":[{"id":"b3bb5e11-ceb6-475b-a9d7-900da9aeb023","sku":"DEP-001","nombre":"Balón de fútbol","categoria":"deportes","precio":89900.0,"stock":100,"imagen_url":"https://localhost:8443/api/product
+
+[15:30:47] 5. Stock antes del pedido
+  HTTP 200 {"producto_id":"29ec2404-e75b-40af-b17b-b10fadee8113","disponible":100,"reservado":0}
+
+[15:30:47] 6. Creación de pedido (2 unidades)
+  HTTP 201 {"id":"140e8d93-a67b-4224-91b6-14fc832df07d","estado":"creado","total":259800.0}
+
+[15:30:47] 7. Consulta del pedido
+  HTTP 200 {"id":"140e8d93-a67b-4224-91b6-14fc832df07d","estado":"creado","total":259800.0,"items":[{"producto_id":"29ec2404-e75b-40af-b17b-b10fadee8113","cantidad":2,"precio_unitario":129900.0}],"created_at":"2026-10-31
+
+[15:30:47] 8. Verificación de inventario
+  HTTP 200 {"producto_id":"29ec2404-e75b-40af-b17b-b10fadee8113","disponible":98,"reservado":2}
+  disponible antes=100 después=98 diferencia=2 esperado=2
+
+OK: prueba de humo superada en 1 s
+código de salida: 0
+tiempo total (down + up + humo): 21 s

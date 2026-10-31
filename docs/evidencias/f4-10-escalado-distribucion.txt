@@ -1,0 +1,18 @@
+$ docker compose ps pedidos nginx
+NAME                      STATUS
+andina-market-nginx-1     Up 11 minutes (healthy)
+andina-market-pedidos-1   Up 11 minutes (healthy)
+andina-market-pedidos-2   Up 3 minutes (healthy)
+andina-market-pedidos-3   Up 3 minutes (healthy)
+
+# Nginx no se reinició al escalar: StartedAt antes=2026-10-31T20:30:36.031353036Z después=2026-10-31T20:30:36.031353036Z
+
+# POST /api/pedidos atendidos por cada réplica durante la medición B (logs de uvicorn)
+    402 pedidos-1
+    402 pedidos-2
+    398 pedidos-3
+
+# Upstreams usados por Nginx para /api/pedidos durante la medición B (access log del gateway)
+    398 upstream=172.28.0.10:8000
+    402 upstream=172.28.0.11:8000
+    402 upstream=172.28.0.8:8000

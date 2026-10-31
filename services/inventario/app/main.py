@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import DateTime, Integer, String, create_engine, func, select
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
+from prometheus_fastapi_instrumentator import Instrumentator
 
 SERVICE_TOKEN = os.environ["SERVICE_TOKEN"]
 engine = create_engine(os.environ["DATABASE_URL"], pool_pre_ping=True)
@@ -57,6 +58,9 @@ class ErrorApi(HTTPException):
 
 
 app = FastAPI(title="Servicio Inventario")
+Instrumentator(should_instrument_requests_inprogress=True, inprogress_labels=True).instrument(app).expose(
+    app, include_in_schema=False
+)
 
 
 @app.exception_handler(ErrorApi)

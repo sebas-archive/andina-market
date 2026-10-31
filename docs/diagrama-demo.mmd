@@ -1,0 +1,19 @@
+%% Arquitectura de la demostración local (Figura 2, informe §6.2).
+%% Render: npx -y @mermaid-js/mermaid-cli@11.4.2 -i docs/diagrama-demo.mmd -o docs/evidencias/f4-01-demo.png -w 1600 -b white
+flowchart LR
+  CLI["curl, humo.sh"] -->|HTTPS 8443| NG
+  K6["k6 (172.28.0.250)"] -->|HTTPS 8443, sin rate limit| NG
+  subgraph RED["Red Docker andina-market (172.28.0.0/24)"]
+    NG["nginx: TLS, rate limit, cabeceras"]
+    NG -->|HTTP 8000| US["usuarios"]
+    NG -->|HTTP 8000| PR["productos"]
+    NG -->|HTTP 8000, DNS 5 s| PE["pedidos × N réplicas"]
+    NG -->|HTTP 8000| IN["inventario"]
+    PR -->|stock, 500 ms| IN
+    PE -->|precios| PR
+    PE -->|reservar / liberar, X-Service-Token| IN
+    US & PR & PE & IN -->|TCP 5432, rol por esquema| DB[("PostgreSQL 16")]
+    PR --> OBJ[("volumen objetos: imágenes y respaldos")]
+    PROM["Prometheus"] -.->|/metrics, DNS| US & PR & PE & IN
+    GRA["Grafana"] -.-> PROM
+  end

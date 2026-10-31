@@ -1,5 +1,6 @@
 import os
 import uuid
+from urllib.parse import urlsplit
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -70,6 +71,7 @@ def test_crear_con_admin_e_imagen_devuelve_201(cliente):
 
 def test_url_firmada_sirve_la_imagen_y_rechaza_firma_alterada(cliente):
     url = cliente.get("/api/productos", params={"q": "TEC-001"}).json()["items"][0]["imagen_url"]
-    ruta = url.split("localhost:8080", 1)[1]
+    partes = urlsplit(url)
+    ruta = f"{partes.path}?{partes.query}"
     assert cliente.get(ruta).status_code == 200
     assert cliente.get(ruta[:-1] + ("0" if ruta[-1] != "0" else "1")).status_code == 403

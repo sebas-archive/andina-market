@@ -14,3 +14,9 @@ Formato: tarea · qué falló · salida del error · alternativa más barata.
 - **Qué falló:** no se pudo descargar la imagen de MinIO ni de Docker Hub ni de quay.io.
 - **Salida:** `pull access denied for minio/minio, repository does not exist or may require 'docker login'` y `quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z: 401 UNAUTHORIZED`.
 - **Alternativa aplicada (recorte autorizado por la Tarea 4.3):** se conserva el endpoint de imágenes; los objetos se guardan en el volumen Docker `objetos` con la estructura `bucket/clave` y se sirven con URL firmadas por HMAC de 15 min (`GET /api/productos/imagenes/{clave}?exp=&firma=`), equivalentes a las URL prefirmadas de S3. Detalle en `docs/PROPUESTAS.md`.
+
+## Tarea 4.11 · Render de la Figura 2 (diagrama de la demo)
+
+- **Qué falló:** el mismo bloqueo de la Tarea 3.1: el agente no puede ejecutar `npx @mermaid-js/mermaid-cli`.
+- **Alternativa más barata:** ejecutar el comando de la cabecera de `docs/diagrama-demo.mmd` (con el mismo Chrome usado para la Figura 1) para generar `docs/evidencias/f4-01-demo.png`.
+- **Pendiente:** `docs/evidencias/f4-01-demo.png` no existe todavía; el informe ya lo referencia.

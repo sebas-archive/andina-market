@@ -1,0 +1,14 @@
+groups:
+  - name: andina-market
+    rules:
+      - alert: LatenciaP95Alta
+        expr: |
+          histogram_quantile(0.95,
+            sum by (servicio, le) (rate(http_request_duration_seconds_bucket{handler!="/metrics"}[1m]))
+          ) > 0.8
+        for: 2m
+        labels:
+          severidad: alta
+        annotations:
+          resumen: "p95 de {{ $labels.servicio }} supera 800 ms durante 2 min"
+          descripcion: "Umbral de RNF-03 para creación de pedidos; revisar CPU de las réplicas y escalar."

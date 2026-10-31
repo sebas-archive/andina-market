@@ -1,0 +1,19 @@
+# Prometheus de la demo: equivalente local de CloudWatch (Tarea 4.6).
+global:
+  scrape_interval: 5s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alertas.yml
+
+scrape_configs:
+  # Descubrimiento por DNS de Docker: cada réplica de un servicio aparece como un target propio.
+  - job_name: servicios
+    dns_sd_configs:
+      - names: [usuarios, productos, pedidos, inventario]
+        type: A
+        port: 8000
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: [__meta_dns_name]
+        target_label: servicio

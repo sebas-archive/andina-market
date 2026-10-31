@@ -5,6 +5,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -13,6 +14,9 @@ from .esquemas import LoginEntrada, RegistroEntrada, TokenSalida, UsuarioSalida
 from .modelos import Usuario, obtener_sesion
 
 app = FastAPI(title="Servicio Usuarios")
+Instrumentator(should_instrument_requests_inprogress=True, inprogress_labels=True).instrument(app).expose(
+    app, include_in_schema=False
+)
 bearer = HTTPBearer(auto_error=False)
 
 

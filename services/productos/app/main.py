@@ -21,6 +21,7 @@ from sqlalchemy import DateTime, Numeric, String, create_engine, func, or_, sele
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from prometheus_fastapi_instrumentator import Instrumentator
 
 JWT_SECRET = os.environ["JWT_SECRET"]
 INVENTARIO_URL = os.environ.get("INVENTARIO_URL", "http://inventario:8000")
@@ -103,6 +104,9 @@ async def ciclo_de_vida(app_: FastAPI):
 
 
 app = FastAPI(title="Servicio Productos", lifespan=ciclo_de_vida)
+Instrumentator(should_instrument_requests_inprogress=True, inprogress_labels=True).instrument(app).expose(
+    app, include_in_schema=False
+)
 bearer = HTTPBearer(auto_error=False)
 
 

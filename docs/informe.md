@@ -178,3 +178,150 @@ La Tabla 7 justifica cada componente de la Figura 1 y registra la alternativa de
 - Las imágenes de producto en S3, con versionado de objetos.
 
 La restauración crea una instancia nueva a partir del instante elegido, sin modificar la original (AWS, s.f.-g). Después se actualiza el endpoint de conexión en Secrets Manager y se reinician las tareas de ECS. Cada mes se ensaya la restauración midiendo su duración frente al RTO de 4 h; en la demo se ensaya con `scripts/respaldo.sh` (§7.3).
+
+## 6. Implementación y pruebas de validación
+
+La demostración sigue la Alternativa B de la guía: una aplicación contenerizada con Docker Compose que reproduce localmente la arquitectura de la Figura 1 y cuyo despliegue en contenedores administrados se describe en §6.3.
+
+### 6.1 Metodología aplicada
+
+La Tabla 9 relaciona los enfoques metodológicos de la guía con su aplicación en este trabajo.
+
+**Tabla 9.** Enfoques de la guía y su aplicación.
+
+| Enfoque de la guía | Cómo se aplicó | Artefacto producido |
+|---|---|---|
+| Aprendizaje basado en proyectos | El equipo resolvió el caso AndinaMarket de punta a punta, del requerimiento a la demo. | Repositorio `andina-market` |
+| Design Science Research | Problema (4 fallas del caso) → requerimientos medibles (§3) → diseño (§5) → evaluación con pruebas (§6.4). | Tablas 1–3, Figura 1, Tabla 11 |
+| Iterativo e incremental | Base de datos, luego cada servicio con sus pruebas, luego gateway, observabilidad, carga y respaldo. La primera prueba de carga reveló el límite de conexiones del gateway y se corrigió. | Commits por tarea; `nginx.conf` |
+| Evaluación basada en pruebas | Cada requerimiento tiene una prueba ejecutable y un veredicto con cifra. | 30 pruebas pytest, `humo.sh`, `pedidos.js`, `respaldo.sh` |
+
+### 6.2 Montaje
+
+La Figura 2 muestra los contenedores de la demo. Nginx cumple el papel del ALB, PostgreSQL el de RDS, el volumen `objetos` el de S3 y Prometheus/Grafana el de CloudWatch.
+
+![Figura 2. Arquitectura de la demostración local.](evidencias/f4-01-demo.png)
+
+**Figura 2.** Arquitectura de la demostración local. Fuente: `docs/diagrama-demo.mmd`.
+
+- **Versiones:** Python 3.12.8, FastAPI 0.115.6, SQLAlchemy 2.0.36, PostgreSQL 16.6, Nginx 1.27.3, Prometheus 2.55.1, Grafana 11.4.0 y k6 0.55.0.
+- **Arranque:** `cp .env.example .env` y `docker compose up -d --wait`. El arranque desde volúmenes vacíos más la prueba de humo tomó 21 s (`f4-06-humo.txt`).
+- **Equipo de prueba:** 20 CPU lógicas y 23 GB de RAM. En reposo, los ocho contenedores ocupan entre 4,5 y 77 MiB cada uno (`f4-11-fallas-y-consumo.txt`).
+- **Recorte:** la imagen de MinIO no estaba disponible en los registros públicos, así que el almacenamiento de objetos es un volumen local con URL firmadas por HMAC de 15 min, equivalentes a las URL prefirmadas de S3.
+
+### 6.3 Mapeo a contenedores administrados
+
+La Tabla 10 traduce cada pieza de la demo a su recurso de AWS.
+
+**Tabla 10.** Correspondencia entre la demo y AWS.
+
+| Pieza de la demo | Equivalente en AWS | Configuración clave | Qué cambia al pasar a producción |
+|---|---|---|---|
+| `docker-compose.yml` (un servicio por dominio) | ECS Task Definition por servicio | Imagen en ECR, `FARGATE`, CPU y memoria por tarea, rol IAM de tarea, logs a CloudWatch (AWS, s.f.-h) | Los secretos salen de Secrets Manager en vez de `.env`. |
+| `docker compose up --scale pedidos=3` | ECS Service con `desiredCount` | El servicio mantiene el número deseado de tareas y reemplaza las que fallan (AWS, s.f.-i) | El número de tareas lo ajusta Service Auto Scaling, no un comando manual. |
+| Nginx (TLS, rutas, reparto) | Application Load Balancer + target groups tipo `ip` | Reglas por ruta `/api/*`, health check `/health` (AWS, s.f.-b) | Certificado de ACM en vez del autofirmado; el rate limit pasa a AWS WAF. |
+| PostgreSQL local | RDS PostgreSQL Multi-AZ | Réplica síncrona en otra zona (AWS, s.f.-e) | Conmutación automática en 60–120 s (AWS, s.f.-f) y PITR. |
+| Volumen `objetos` | Amazon S3 | Buckets `productos` y `respaldos`, URL prefirmadas | Cifrado en reposo, versionado y ciclo de vida. |
+| Prometheus y Grafana | Amazon CloudWatch | Métricas de servicio ECS y ALB, alarmas (AWS, s.f.-j) | Sin servidores de monitoreo propios. |
+
+**Autoescalado objetivo.** Cada servicio usa ECS Service Auto Scaling con dos políticas de seguimiento de objetivo (AWS, s.f.-k): CPU media del 60 % y `ALBRequestCountPerTarget`, que mide el promedio de solicitudes por target y se reporta cada 60 s (AWS, s.f.-l). El rango es de 2 a 10 tareas por servicio. En la demo, una réplica de productos con una de inventario sostuvo unas 30 consultas de catálogo exitosas por segundo con inventario al 85 % de un núcleo (Tabla 12). Con el objetivo del 60 %, cada tarea debería recibir unas 18 req/s (≈ 1.080 solicitudes por minuto por target).
+
+El pico canónico de 300 req/s incluye un 90 % de catálogo, es decir 270 req/s. A 18 req/s por tarea se necesitarían 15 tareas de productos, por encima del máximo de 10. Para pedidos, el 10 % del pico (30 req/s) cabe en el mínimo de 2 tareas, que en la demo no pasaron del 6 % de CPU. Esta capacidad se midió en el equipo local y debe recalibrarse en Fargate.
+
+**ECS Fargate frente a EKS.** EKS ofrece la portabilidad de Kubernetes, pero exige operar el clúster: versiones, complementos y manifiestos. Para un equipo sin personal de operaciones, ese costo contradice el criterio de administración técnica que más pesa en la Tabla 5. Fargate ejecuta las mismas imágenes sin administrar servidores ni clústeres (AWS, s.f.-b) y se integra de forma nativa con el ALB y Service Auto Scaling. Kubernetes queda como alternativa si el número de servicios crece o si se requiere portabilidad entre nubes.
+
+### 6.4 Resultados
+
+La Tabla 11 cubre los seis aspectos de la Etapa 5 de la guía. La Tabla 12 compara la prueba de carga con 1 y 3 réplicas del servicio de pedidos.
+
+**Tabla 11.** Resultados de las pruebas de validación.
+
+| Aspecto de la Etapa 5 | Escenario probado | Método / comando | Resultado medido | Criterio | Veredicto |
+|---|---|---|---|---|---|
+| Acceso y autenticación | Registro, login, token, bloqueo, roles | `pytest` de usuarios y productos | 8/8 y 8/8 pruebas; 423 al sexto intento; 403 a `cliente` en `POST /api/productos` | RF-01, RF-02 | Cumple |
+| Disponibilidad | Flujo completo y caída de pedidos e inventario | `humo.sh`; `docker compose stop` | Humo en 1 s; sin pedidos, el catálogo responde 200 en 23 ms; sin inventario, `stock: null` en 509 ms; recuperación en 12,4 s y 11,5 s | RNF-01 (degradación) | Cumple en la demo; el 99,9 % mensual no es medible localmente |
+| Aumento de solicitudes | Rampa 20 → 100 → 200 req/s | `escalar.sh` (k6) | 63 req/s procesadas; 42,6–45,2 % de errores; p95 = 5 s | RNF-03, RNF-04 | No cumple |
+| Protección de la información | TLS, cabeceras, rate limit, rutas internas, contraseñas | `curl`, `openssl s_client`, consulta SQL | TLS 1.3; 4 cabeceras; 29 de 50 solicitudes en ráfaga con 429; 403 en `/reservar`; hash `$2a$12$` | RNF-02 | Cumple parcialmente (sin cifrado en reposo local) |
+| Recuperación ante fallos | Pedido borrado y restaurado | `respaldo.sh --probar` | Mismo ID recuperado; restauración en 554 ms; respaldo de 340 KB | RNF-01 (RTO/RPO) | Cumple |
+| Consumo y costos | CPU y RAM por contenedor | `docker stats` | Bajo carga: inventario 85–89 % y productos 67–68 % de un núcleo; pedidos ≤ 6 %. En reposo, ≤ 77 MiB | Dimensionamiento de §8 | Insumo para §8 |
+
+**Tabla 12.** Prueba de carga con 1 y 3 réplicas de pedidos (rampa de 3 min hasta 200 req/s).
+
+| Indicador | pedidos = 1 | pedidos = 3 | Cambio |
+|---|---|---|---|
+| Solicitudes procesadas | 11.839 (63,2 req/s) | 11.912 (63,2 req/s) | +0,6 % |
+| Iteraciones descartadas por falta de VU | 1.962 | 1.890 | −3,7 % |
+| Tasa de error global | 45,15 % | 42,61 % | −2,5 puntos |
+| p95 global | 5 s | 5 s | sin cambio (tope del timeout del gateway) |
+| `POST /api/pedidos` exitosos | 853 de 1.173 (72,7 %) | 1.065 de 1.202 (88,6 %) | +15,9 puntos |
+| Latencia media de creación de pedido | 712,7 ms | 434,4 ms | −39,0 % |
+| CPU media por réplica de pedidos | 5,7 % | 3,5–3,8 % | −35 % |
+| CPU media de productos / inventario | 67,2 % / 84,7 % | 67,9 % / 88,6 % | sin cambio |
+
+Fuentes: `f4-07-carga-1-replica.txt`, `f4-08-carga-3-replicas.txt` y `f4-10-escalado-distribucion.txt`.
+
+El escalado de pedidos repartió la carga de forma pareja: 402, 402 y 398 solicitudes por réplica, sin reiniciar el gateway. Mejoró el indicador propio de ese servicio, con 15,9 puntos más de pedidos exitosos y 39 % menos de latencia media. No mejoró el sistema en conjunto: el rendimiento se mantuvo en 63 req/s y el p95 en 5 s.
+
+La causa es que el cuello de botella está en productos e inventario, cada uno con un solo proceso y cerca del límite de un núcleo. Cada listado de productos genera cinco consultas de stock a inventario. Los errores fueron 504 del gateway al vencer el plazo de 5 s en `/api/productos` (4.939 en la medición B) y 503 de pedidos cuando el catálogo no respondió a tiempo (137). En consecuencia, RNF-03 y RNF-04 no se cumplen en la demo: escalar horizontalmente solo sirve si se escala el servicio que satura.
+
+### 6.5 Límites de la demo
+
+- No reproduce la latencia de red real entre usuarios en Colombia y `us-east-1`: todas las pruebas son locales.
+- No demuestra Multi-AZ ni el aislamiento de fallas por zona: hay una sola instancia de PostgreSQL y un solo host.
+- La capacidad por réplica se midió en un equipo de 20 CPU compartido por todos los contenedores y el generador de carga; no equivale a una tarea de Fargate.
+- No genera costos reales. La estimación de §8 usa precios publicados, no facturación.
+- Simplifica el pago a una llamada síncrona con fallo aleatorio, sin cola SQS ni pasarela real, y no incluye la verificación de email de RF-01.
+
+### 6.6 Evidencias
+
+La Tabla 13 indexa cada evidencia con la figura o tabla que la cita.
+
+**Tabla 13.** Índice de evidencias.
+
+| Figura/Tabla | Archivo en `docs/evidencias` | Qué demuestra |
+|---|---|---|
+| Figura 1 | `f3-01-arquitectura.png` | Arquitectura con los 7 elementos exigidos |
+| Figura 2 | `f4-01-demo.png` | Contenedores de la demo |
+| Figura 3 | `f4-05-grafana.png` | Dashboard con RPS, p95, 5xx y CPU/memoria bajo tráfico real |
+| Tabla 11 | `f4-06-humo.txt` | Flujo completo y descuento exacto de stock |
+| Tablas 11 y 11 | `f4-07-carga-1-replica.txt`, `f4-08-carga-3-replicas.txt` | Prueba de carga con 1 y 3 réplicas |
+| Tabla 12 | `f4-10-escalado-distribucion.txt` | Tres réplicas activas y reparto de solicitudes |
+| Tabla 11 | `f4-09-restauracion.txt` | Restauración con el mismo ID de pedido |
+| Tabla 11 | `f4-11-fallas-y-consumo.txt` | Degradación ante caída de servicios y consumo en reposo |
+
+La Figura 3 muestra el dashboard de Grafana durante una ráfaga de tráfico real, con los cuatro paneles que exige la Tarea 4.6.
+
+![Figura 3. Dashboard de observabilidad con tráfico real.](evidencias/f4-05-grafana.png)
+
+**Figura 3.** Dashboard de observabilidad con tráfico real.
+
+## 7. Seguridad y disponibilidad
+
+### 7.1 Control de acceso
+
+La Tabla 14 resume quién puede invocar cada recurso de la API y dónde se aplica el control. La autorización se resuelve con el claim `rol` del JWT (15 min) y, para las operaciones internas de inventario, con la cabecera `X-Service-Token`; el gateway rechaza esas rutas desde fuera con 403.
+
+**Tabla 14.** Matriz de autorización (✔ permitido, ✘ denegado).
+
+| Recurso | Público | Cliente | Admin | Servicio interno | Dónde se aplica |
+|---|---|---|---|---|---|
+| `POST /api/usuarios/registro`, `POST /api/usuarios/login` | ✔ | ✔ | ✔ | — | Servicio Usuarios (bloqueo tras 5 fallos en 15 min) |
+| `GET /api/usuarios/me` | ✘ 401 | ✔ propio | ✔ propio | — | Servicio Usuarios |
+| `GET /api/productos`, `GET /api/productos/{id}`, imagen con URL firmada | ✔ | ✔ | ✔ | — | Servicio Productos (firma HMAC de 15 min en imágenes) |
+| `POST /api/productos` | ✘ 401 | ✘ 403 | ✔ | — | Servicio Productos |
+| `GET /api/inventario/{id}` | ✔ | ✔ | ✔ | ✔ | Servicio Inventario |
+| `POST /api/inventario/{id}/reservar`, `/liberar` | ✘ 403 | ✘ 403 | ✘ 403 | ✔ con `X-Service-Token` | Gateway (403) y Servicio Inventario (401) |
+| `POST /api/pedidos`, `GET /api/pedidos` | ✘ 401 | ✔ propios | ✔ propios | — | Servicio Pedidos |
+| `GET /api/pedidos/{id}`, `POST /api/pedidos/{id}/pago` | ✘ 401 | ✔ solo el dueño (404 si no) | ✔ solo el dueño | — | Servicio Pedidos |
+
+En el gateway se limita cada IP a 10 req/s con ráfaga de 20 y se responde 429 al exceder; el umbral de la demo protege contra abuso desde una sola IP, y en producción se ajustaría al tráfico real por usuario en AWS WAF. El tráfico externo solo se acepta por HTTPS (TLS 1.2 y 1.3; el puerto HTTP redirige con 301) y cada respuesta incluye las cabeceras `Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options: DENY` y `Referrer-Policy`.
+
+### 7.3 Respaldo y recuperación
+
+En la demo, `scripts/respaldo.sh` genera un `pg_dump` comprimido con marca de tiempo en `respaldos/` y lo copia al bucket `respaldos` del almacén de objetos. La prueba `--probar` crea un pedido, respalda, borra el pedido, restaura en una base temporal y verifica que reaparece: el pedido `05b57d5a-…` se recuperó con el mismo ID y la restauración tardó 554 ms (`f4-09-restauracion.txt`).
+
+En producción se proponen tres medidas:
+
+- **Frecuencia:** respaldos automáticos de RDS con PITR. RDS sube los registros de transacciones a S3 cada 5 min (AWS, s.f.-g), lo que deja la pérdida máxima por debajo del RPO de 15 min de RNF-01. Además, un `pg_dump` diario se guarda en S3 como copia lógica independiente.
+- **Retención:** 30 días para los respaldos automáticos y las copias lógicas.
+- **Verificación:** cada mes se restaura en una instancia nueva, sin tocar la original (AWS, s.f.-g), y se mide el tiempo total. Ese tiempo incluye restaurar, actualizar el endpoint en Secrets Manager y reiniciar las tareas de ECS, y debe quedar por debajo del RTO de 4 h. La restauración local de 554 ms solo valida el procedimiento; el tiempo real depende del tamaño de la base y de la instancia.
