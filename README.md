@@ -17,7 +17,7 @@ docker compose up -d --wait
 ## Entregables
 
 | Entregable | Ubicación | Estado |
-|---|---|---|
+|------------|-----------|--------|
 | Documento técnico | [`docs/informe.md`](docs/informe.md) → `entrega/Informe_Guia7_AndinaMarket.pdf` (se genera con `scripts/exportar.sh`) | Completo; faltan los datos de portada marcados `[verificar]` |
 | Diagrama de arquitectura | [`docs/diagrama-arquitectura.mmd`](docs/diagrama-arquitectura.mmd), [`.drawio`](docs/diagrama-arquitectura.drawio), PNG en [`docs/evidencias/f3-01-arquitectura.png`](docs/evidencias/f3-01-arquitectura.png) | Completo |
 | Evidencias de implementación | [`docs/evidencias/`](docs/evidencias/) → [`entrega/Evidencias_Guia7.zip`](entrega/Evidencias_Guia7.zip) (índice: Anexo A del informe) | Completo; falta `f5-01-calculadora.png` (ver `docs/BLOQUEOS.md`) |
