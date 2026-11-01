@@ -50,7 +50,7 @@ Con el sistema arriba, abrir `https://localhost:8443/` (certificado autofirmado:
 
 ## Guion de demo
 
-Flujo completo a través del gateway (`https://localhost:8443`, certificado autofirmado: por eso `-k`): registro → login → catálogo → pedido → pago → consulta. Requiere `python3` para leer el JSON.
+Flujo completo a través del gateway (`https://localhost:8443`, certificado autofirmado: por eso `-k`): registro, login, catálogo, pedido , pago , consulta. Requiere `python3` para leer el JSON.
 
 ```bash
 curl -sk -X POST https://localhost:8443/api/usuarios/registro -H 'Content-Type: application/json' -d '{"email":"demo@example.com","password":"ClaveDemo123","nombre":"Demo"}'
