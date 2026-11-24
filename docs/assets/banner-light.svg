@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="1200" height="300" role="img" aria-label="AndinaMarket: e-commerce en microservicios para la nube">
+<polygon points="105,52 141,73 141,115 105,136 69,115 69,73" fill="#0f766e" fill-opacity="0.10" stroke="#0f766e" stroke-width="4" stroke-linejoin="round"/>
+<path d="M76 114 L96 84 L109 102 L117 92 L134 114 Z" fill="#d97706" stroke="#d97706" stroke-width="3" stroke-linejoin="round"/>
+<circle cx="122" cy="82" r="5" fill="#0f766e"/>
+<text x="164" y="110" font-family="'Segoe UI','Inter','Helvetica Neue',Arial,sans-serif" font-size="60" font-weight="700" fill="#0f172a" letter-spacing="-1">AndinaMarket</text>
+<text x="166" y="148" font-family="'Segoe UI','Inter','Helvetica Neue',Arial,sans-serif" font-size="20" fill="#475569">Microservicios contenerizados para la nube</text>
+<rect x="164" y="172" width="113" height="32" rx="16" fill="#0f766e" fill-opacity="0.10" stroke="#0f766e" stroke-width="1.5"/>
+<text x="220.5" y="193" text-anchor="middle" font-family="'JetBrains Mono','SFMono-Regular',Consolas,'DejaVu Sans Mono',monospace" font-size="15" fill="#0f766e">usuarios</text>
+<rect x="289" y="172" width="122" height="32" rx="16" fill="#0f766e" fill-opacity="0.10" stroke="#0f766e" stroke-width="1.5"/>
+<text x="350.0" y="193" text-anchor="middle" font-family="'JetBrains Mono','SFMono-Regular',Consolas,'DejaVu Sans Mono',monospace" font-size="15" fill="#0f766e">productos</text>
+<rect x="423" y="172" width="103" height="32" rx="16" fill="#0f766e" fill-opacity="0.10" stroke="#0f766e" stroke-width="1.5"/>
+<text x="474.5" y="193" text-anchor="middle" font-family="'JetBrains Mono','SFMono-Regular',Consolas,'DejaVu Sans Mono',monospace" font-size="15" fill="#0f766e">pedidos</text>
+<rect x="538" y="172" width="132" height="32" rx="16" fill="#0f766e" fill-opacity="0.10" stroke="#0f766e" stroke-width="1.5"/>
+<text x="604.0" y="193" text-anchor="middle" font-family="'JetBrains Mono','SFMono-Regular',Consolas,'DejaVu Sans Mono',monospace" font-size="15" fill="#0f766e">inventario</text>
+<text x="166" y="246" font-family="'Segoe UI','Inter','Helvetica Neue',Arial,sans-serif" font-size="15" fill="#475569">FastAPI · PostgreSQL 16 · Nginx · Docker Compose · Prometheus · Grafana</text>
+<path d="M900 172 C 930 172 930 90 960 90" fill="none" stroke="#0f766e" stroke-width="2" stroke-opacity="0.7"/>
+<path d="M900 172 C 930 172 930 145 960 145" fill="none" stroke="#0f766e" stroke-width="2" stroke-opacity="0.7"/>
+<path d="M900 172 C 930 172 930 200 960 200" fill="none" stroke="#0f766e" stroke-width="2" stroke-opacity="0.7"/>
+<path d="M900 172 C 930 172 930 255 960 255" fill="none" stroke="#0f766e" stroke-width="2" stroke-opacity="0.7"/>
+<rect x="790" y="146" width="110" height="52" rx="12" fill="#d97706" fill-opacity="0.10" stroke="#d97706" stroke-width="2"/>
+<text x="845" y="170" text-anchor="middle" font-family="'Segoe UI','Inter','Helvetica Neue',Arial,sans-serif" font-size="17" font-weight="700" fill="#0f172a">Nginx</text>
+<text x="845" y="188" text-anchor="middle" font-family="'Segoe UI','Inter','Helvetica Neue',Arial,sans-serif" font-size="12" fill="#475569">gateway TLS</text>
+<rect x="960" y="70" width="170" height="40" rx="8" fill="#0f766e" fill-opacity="0.10" stroke="#0f766e" stroke-width="1.5"/>
+<text x="1045" y="96" text-anchor="middle" font-family="'JetBrains Mono','SFMono-Regular',Consolas,'DejaVu Sans Mono',monospace" font-size="15" fill="#0f172a">usuarios</text>
+<rect x="960" y="125" width="170" height="40" rx="8" fill="#0f766e" fill-opacity="0.10" stroke="#0f766e" stroke-width="1.5"/>
+<text x="1045" y="151" text-anchor="middle" font-family="'JetBrains Mono','SFMono-Regular',Consolas,'DejaVu Sans Mono',monospace" font-size="15" fill="#0f172a">productos</text>
+<rect x="960" y="180" width="170" height="40" rx="8" fill="#0f766e" fill-opacity="0.10" stroke="#0f766e" stroke-width="1.5"/>
+<text x="1045" y="206" text-anchor="middle" font-family="'JetBrains Mono','SFMono-Regular',Consolas,'DejaVu Sans Mono',monospace" font-size="15" fill="#0f172a">pedidos</text>
+<rect x="960" y="235" width="170" height="40" rx="8" fill="#0f766e" fill-opacity="0.10" stroke="#0f766e" stroke-width="1.5"/>
+<text x="1045" y="261" text-anchor="middle" font-family="'JetBrains Mono','SFMono-Regular',Consolas,'DejaVu Sans Mono',monospace" font-size="15" fill="#0f172a">inventario</text>
+</svg>
