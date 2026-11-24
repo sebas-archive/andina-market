@@ -16,13 +16,13 @@
 </p>
 
 <p align="center">
-  <a href="#-descripción">Descripción</a> ·
-  <a href="#-arquitectura">Arquitectura</a> ·
-  <a href="#-tecnologías">Tecnologías</a> ·
-  <a href="#-inicio-rápido">Inicio rápido</a> ·
-  <a href="#-pruebas-y-validación">Pruebas</a> ·
-  <a href="#-documentación">Documentación</a> ·
-  <a href="#-licencia">Licencia</a>
+  <a href="#descripción">Descripción</a> ·
+  <a href="#arquitectura">Arquitectura</a> ·
+  <a href="#tecnologías">Tecnologías</a> ·
+  <a href="#inicio-rápido">Inicio rápido</a> ·
+  <a href="#pruebas-y-validación">Pruebas</a> ·
+  <a href="#documentación">Documentación</a> ·
+  <a href="#licencia">Licencia</a>
 </p>
 
 <p align="center">
@@ -32,7 +32,7 @@
   </picture>
 </p>
 
-## 🧭 Descripción
+## Descripción
 
 **AndinaMarket S.A.S.** es un e-commerce ficticio. Este repositorio contiene la **demostración contenerizada** de su arquitectura en la nube y la documentación técnica del trabajo de la Guía 7 (Computación en la Nube).
 
@@ -45,18 +45,18 @@ La demo levanta con Docker Compose cuatro microservicios de dominio detrás de u
   </picture>
 </p>
 
-## ✨ Características
+## Características
 
-| | Capacidad | Detalle |
-|---|---|---|
-| 🧩 | **Microservicios de dominio** | `usuarios`, `productos`, `pedidos` e `inventario`, cada uno con su propia API FastAPI y su propio rol de base de datos. |
-| 🔐 | **Autenticación con JWT** | Registro, inicio de sesión y rutas protegidas; el catálogo de administración exige rol `admin`. |
-| 🛒 | **Pedidos con reserva de stock** | Reserva el inventario al crear el pedido, admite `Idempotency-Key` y libera el stock si el pago falla (HTTP 402). |
-| 🖼️ | **Catálogo con imágenes** | Fotos de muestra servidas por el gateway, con un límite de tasa propio que no consume el cupo de la API. |
-| 🛡️ | **Gateway seguro** | Nginx con HTTPS, límite de tasa por IP y bloqueo de los endpoints internos de inventario desde Internet. |
-| 📈 | **Observabilidad** | Prometheus con descubrimiento de réplicas por DNS, dashboard de Grafana aprovisionado y alertas (p95 de latencia). |
-| ⚖️ | **Escalado horizontal** | `pedidos` se escala con `docker compose up --scale`; cada réplica se resuelve por DNS de Docker y aparece como target en Prometheus. |
-| 🧪 | **Pruebas y carga** | 30 pruebas `pytest` repartidas entre los cuatro servicios y un script de carga con k6. |
+| Capacidad | Detalle |
+|---|---|
+| **Microservicios de dominio** | `usuarios`, `productos`, `pedidos` e `inventario`, cada uno con su propia API FastAPI y su propio rol de base de datos. |
+| **Autenticación con JWT** | Registro, inicio de sesión y rutas protegidas; el catálogo de administración exige rol `admin`. |
+| **Pedidos con reserva de stock** | Reserva el inventario al crear el pedido, admite `Idempotency-Key` y libera el stock si el pago falla (HTTP 402). |
+| **Catálogo con imágenes** | Fotos de muestra servidas por el gateway, con un límite de tasa propio que no consume el cupo de la API. |
+| **Gateway seguro** | Nginx con HTTPS, límite de tasa por IP y bloqueo de los endpoints internos de inventario desde Internet. |
+| **Observabilidad** | Prometheus con descubrimiento de réplicas por DNS, dashboard de Grafana aprovisionado y alertas (p95 de latencia). |
+| **Escalado horizontal** | `pedidos` se escala con `docker compose up --scale`; cada réplica se resuelve por DNS de Docker y aparece como target en Prometheus. |
+| **Pruebas y carga** | 30 pruebas `pytest` repartidas entre los cuatro servicios y un script de carga con k6. |
 
 <p align="center">
   <picture>
@@ -65,7 +65,7 @@ La demo levanta con Docker Compose cuatro microservicios de dominio detrás de u
   </picture>
 </p>
 
-## 🧱 Arquitectura
+## Arquitectura
 
 La demo reproduce en local la arquitectura propuesta para AWS: el gateway Nginx cumple el papel del balanceador (ALB), PostgreSQL el de RDS, el volumen `objetos` el de S3 y Prometheus con Grafana el de CloudWatch.
 
@@ -96,7 +96,7 @@ Las reservas entre servicios viajan con la cabecera `X-Service-Token`. Cada serv
   </picture>
 </p>
 
-## 🛠️ Tecnologías
+## Tecnologías
 
 | Capa | Tecnología | Versión en la demo |
 |---|---|---|
@@ -114,7 +114,7 @@ Las reservas entre servicios viajan con la cabecera `X-Service-Token`. Cada serv
   </picture>
 </p>
 
-## 🚀 Inicio rápido
+## Inicio rápido
 
 ### Requisitos
 
@@ -148,7 +148,7 @@ Antes de arrancar, reemplace los valores `cambiar_esto` de `.env`. El archivo `.
 
 Con el sistema arriba, abra `https://localhost:8443/` (certificado autofirmado: acepte la advertencia del navegador). Permite navegar el catálogo, iniciar sesión con un usuario de prueba, armar el carrito, crear y pagar pedidos y ver «Mis pedidos». Fuente: [`web/`](web/). Está fuera del alcance del plan ([`docs/PROPUESTAS.md`](docs/PROPUESTAS.md), punto 21).
 
-## 🎬 Ejemplo de uso
+## Ejemplo de uso
 
 Flujo completo a través del gateway (`https://localhost:8443`, con certificado autofirmado: por eso `-k`): registro, login, catálogo, pedido, pago y consulta. Requiere `python3` para leer el JSON.
 
@@ -165,7 +165,7 @@ curl -sk https://localhost:8443/api/pedidos/$PEDIDO -H "Authorization: Bearer $T
 >
 > **Usuarios de prueba** creados por `db/seed.sql`: `admin@example.com` (admin), `cliente1@example.com` y `cliente2@example.com`, con la contraseña definida en `SEED_USUARIOS_PASSWORD`.
 
-## 📸 Capturas
+## Capturas
 
 <table>
   <tr>
@@ -187,7 +187,7 @@ curl -sk https://localhost:8443/api/pedidos/$PEDIDO -H "Authorization: Bearer $T
   </picture>
 </p>
 
-## 🧪 Pruebas y validación
+## Pruebas y validación
 
 Cada servicio tiene su batería `pytest` que se ejecuta contra la PostgreSQL de Docker:
 
@@ -219,7 +219,7 @@ Además:
   </picture>
 </p>
 
-## 📁 Estructura del proyecto
+## Estructura del proyecto
 
 ```text
 andina-market/
@@ -242,7 +242,7 @@ andina-market/
   </picture>
 </p>
 
-## 📚 Documentación
+## Documentación
 
 | Documento | Ubicación | Estado |
 |---|---|---|
@@ -269,6 +269,6 @@ Las fotos del catálogo de muestra son de Wikimedia Commons con licencias libres
   </picture>
 </p>
 
-## 📄 Licencia
+## Licencia
 
 Distribuido bajo la **GNU Affero General Public License v3.0**. Consulte el texto completo en [`LICENSE`](LICENSE).
